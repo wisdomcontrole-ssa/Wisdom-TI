@@ -1,0 +1,34 @@
+import {
+  Bell,
+  Boxes,
+  ClipboardCheck,
+  LayoutDashboard,
+  MapPin,
+  Monitor,
+  Settings,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
+import type { PermissionCode } from '../../types/auth'
+
+export interface NavigationItem {
+  label: string
+  path: string
+  icon: LucideIcon
+  permission: PermissionCode
+  mobile?: boolean
+}
+
+export const mainNavigation: NavigationItem[] = [
+  { label: 'Visão geral', path: '/dashboard', icon: LayoutDashboard, permission: 'dashboard.view', mobile: true },
+  { label: 'Patrimônio', path: '/patrimonio', icon: Monitor, permission: 'assets.view', mobile: true },
+  { label: 'Estoque', path: '/estoque', icon: Boxes, permission: 'stock.view', mobile: true },
+  { label: 'Auditorias', path: '/auditorias', icon: ClipboardCheck, permission: 'audits.view', mobile: true },
+  { label: 'Alertas', path: '/alertas', icon: Bell, permission: 'alerts.view' },
+  { label: 'Ambientes', path: '/ambientes', icon: MapPin, permission: 'locations.view' },
+]
+
+export const adminNavigation: NavigationItem[] = [
+  { label: 'Usuários', path: '/usuarios', icon: Users, permission: 'users.view' },
+  { label: 'Configurações', path: '/configuracoes', icon: Settings, permission: 'settings.view' },
+]
