@@ -34,6 +34,7 @@ export type PermissionCode =
   | 'alerts.manage'
   | 'locations.view'
   | 'locations.manage'
+  | 'reports.view'
   | 'users.view'
   | 'users.manage'
   | 'settings.view'

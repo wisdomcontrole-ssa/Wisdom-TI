@@ -9,11 +9,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['wisdom-ti.svg'],
+      includeAssets: ['inventario-ti.svg'],
       manifest: {
-        name: 'Wisdom TI',
-        short_name: 'Wisdom TI',
-        description: 'Gestão interna de tecnologia da informação da Wisdom',
+        name: 'Inventário TI',
+        short_name: 'Inventário TI',
+        description:
+          'Patrimônio, estoque, auditorias, manutenção e inventário automático de TI.',
         theme_color: '#0b1220',
         background_color: '#f4f6f9',
         display: 'standalone',
@@ -21,13 +22,13 @@ export default defineConfig({
         scope: '/',
         icons: [
           {
-            src: '/wisdom-ti.svg',
+            src: '/inventario-ti.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'any',
           },
           {
-            src: '/wisdom-ti.svg',
+            src: '/inventario-ti.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'maskable',
@@ -36,4 +37,36 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const normalized = id.replaceAll('\\', '/')
+
+          if (
+            normalized.includes('/node_modules/html5-qrcode/') ||
+            normalized.includes('/node_modules/react-qr-code/')
+          ) {
+            return 'qr'
+          }
+
+          if (
+            normalized.includes('/node_modules/@supabase/')
+          ) {
+            return 'supabase'
+          }
+
+          if (
+            normalized.includes('/node_modules/react/') ||
+            normalized.includes('/node_modules/react-dom/') ||
+            normalized.includes('/node_modules/react-router/')
+          ) {
+            return 'react'
+          }
+
+          return undefined
+        },
+      },
+    },
+  },
 })

@@ -1,12 +1,31 @@
-# WISDOM TI — MASTER CONTEXT
+# INVENTÁRIO TI — MASTER CONTEXT
 
-## 1. Estado atual
+## 1. Identidade do produto
 
-Projeto: Wisdom TI.
+Nome genérico oficial do aplicativo:
 
-Marco atual concluído e validado:
+`Inventário TI`
 
-M09 — Agente Windows + inventário automático + heartbeat + divergências + alertas reais.
+O nome anterior do produto não deve ser usado como marca principal da interface.
+
+A organização usuária pode personalizar:
+
+- nome institucional;
+- logomarca PNG;
+- e-mail de suporte;
+- demais parâmetros institucionais disponíveis em Administração → Configurações.
+
+Fallback:
+
+- quando não houver identidade institucional configurada, usar `Inventário TI`.
+
+Repositório e nomes técnicos internos podem continuar usando `wisdom-ti` para preservar compatibilidade e histórico.
+
+## 2. Estado atual
+
+Projeto funcional concluído até:
+
+M10 — Consolidação operacional + identidade institucional + dashboard real + relatórios.
 
 Marcos concluídos:
 
@@ -19,54 +38,30 @@ Marcos concluídos:
 - M07 — Manutenção, ciclo de vida e descarte.
 - M08 — Administração real.
 - M09 — Agente Windows, inventário automático, divergências e alertas reais.
-- M09 V2 UX — instalador gráfico universal + visualização de armazenamento e softwares.
+- M09 V2 — Instalador gráfico do agente + armazenamento + softwares.
+- M10 — Branding institucional + etiquetas + dashboard real + relatórios + preparação PWA/Cloudflare.
 
-Validação M09:
+Status funcional:
 
-- SQL M09 aplicado no Supabase oficial;
-- Edge Function `agent-admin` publicada;
-- Edge Function `agent-ingest` publicada;
-- frontend build OK;
-- lint OK com warnings não bloqueantes preexistentes;
-- agente .NET 10 build OK;
-- pacote Windows gerado;
-- agente real instalado em Windows;
-- heartbeat real recebido;
-- agente exibido Online na ficha do ativo;
-- sistema operacional coletado;
-- CPU coletada;
-- RAM coletada;
-- hostname coletado;
-- fabricante/modelo/serial coletados;
-- volumes/discos coletados;
-- softwares instalados coletados;
-- divergência real criada;
-- alertas reais integrados;
-- token individual funcionando;
-- rotação/revogação disponíveis;
-- instalador gráfico validado;
-- fluxo normal de instalação sem PowerShell na máquina-alvo;
-- armazenamento detalhado exibido;
-- programas instalados exibidos e pesquisáveis;
-- status final: M09 OK.
+`M10 FUNCIONAL OK`
 
-Não reconstruir M01–M09 sem evidência concreta de regressão.
+Não reconstruir M01–M10 sem evidência concreta de regressão.
 
 Próximo marco:
 
-M10 — Consolidação operacional e produção.
+M11 — Produção, Cloudflare Pages, hardening e distribuição do agente.
 
-## 2. Repositório e ambiente
+## 3. Repositório e ambiente
 
 Projeto local:
 
 `C:\Projetos\TI Wisdom\wisdom-ti`
 
-Backups externos:
+Backups:
 
 `C:\Projetos\TI Wisdom\_backups\wisdom-ti`
 
-Builds externos:
+Build externo do agente:
 
 `C:\Projetos\TI Wisdom\_builds\wisdom-ti-agent`
 
@@ -74,11 +69,11 @@ Repositório:
 
 `https://github.com/wisdomcontrole-ssa/Wisdom-TI.git`
 
-Branch principal:
+Branch:
 
 `main`
 
-Ambiente:
+Ambiente principal:
 
 - Windows;
 - VS Code;
@@ -88,17 +83,9 @@ Ambiente:
 - Supabase CLI;
 - .NET 10 SDK.
 
-Regras Git:
+## 4. Supabase oficial
 
-- verificar branch, remote e `git status` antes de cada macrobloco;
-- ao concluir macrobloco: build, lint, testes, commit e push;
-- não usar force push no fluxo normal;
-- preservar trabalho local;
-- artefatos de build não devem ser versionados.
-
-## 3. Supabase oficial
-
-Project Ref oficial:
+Project Ref:
 
 `dqfbzsneaamihfphjfcj`
 
@@ -108,11 +95,11 @@ Project URL:
 
 Regra permanente:
 
-- toda Edge Function, SQL, `.env.local` e deploy deve apontar para esse projeto;
-- não inferir projeto por nome mostrado pela CLI;
-- não usar outros Project Refs do mesmo usuário.
+- SQL, Edge Functions, ambiente frontend e agente devem apontar para esse projeto;
+- não usar outros projetos Supabase existentes na conta;
+- validar Project Ref antes de deploys administrativos.
 
-## 4. Stack
+## 5. Stack consolidada
 
 Frontend/PWA:
 
@@ -133,39 +120,38 @@ Backend:
 - RLS;
 - RBAC;
 - RPCs PostgreSQL;
+- Supabase Storage;
 - Supabase Edge Functions;
-- pg_cron para verificação periódica de conectividade do agente.
+- pg_cron.
 
 Evidências:
 
-- Google Drive;
-- Google Apps Script;
-- DriveApp;
-- Supabase Edge Functions como ponte segura.
+React → Supabase → Edge Function → Google Apps Script → Google Drive.
 
 Agente Windows:
 
 - C#/.NET 10;
-- executável self-contained win-x64;
-- instalador gráfico WinForms self-contained;
-- coleta via Windows PowerShell/CIM internamente;
+- self-contained win-x64;
+- WinForms para instalador gráfico;
+- CIM/PowerShell interno para inventário;
+- HTTPS;
+- token individual;
+- MachineGuid;
+- tarefas agendadas;
 - heartbeat;
-- inventário de hardware/software;
-- identidade por MachineGuid;
-- token individual revogável.
+- histórico de snapshots.
 
-Hospedagem planejada:
+Hospedagem:
 
-- Cloudflare Pages.
+- preparada para Cloudflare Pages;
+- publicação de produção ainda é pendência do M11.
 
-## 5. Segurança e variáveis de ambiente
+## 6. Variáveis e secrets
 
 Frontend:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
-
-Valores reais ficam apenas em `.env.local`, fora do Git.
 
 M06 Edge Functions:
 
@@ -177,36 +163,55 @@ Google Apps Script:
 - `WISDOM_SHARED_SECRET`
 - `WISDOM_ROOT_FOLDER_ID`
 
-Regras:
+Nunca versionar valores reais.
 
-- nunca registrar valores reais de secrets;
-- nunca colocar `service_role`, secret key, senha PostgreSQL ou token administrativo no frontend ou agente;
-- Publishable/anon pública pode existir no frontend;
-- credenciais administrativas ficam somente no backend/infraestrutura;
-- o agente usa credencial própria, individual e revogável;
-- token do agente não deve ser enviado por chat/e-mail;
-- banco guarda hash SHA-256 da credencial do agente;
-- token pode ser rotacionado ou revogado;
-- MachineGuid protege contra uso da mesma credencial em outra máquina;
-- HTTPS obrigatório para comunicação do agente.
+Nunca colocar no frontend ou agente:
 
-## 6. Encoding e PowerShell
+- service_role;
+- secret key;
+- senha PostgreSQL;
+- senha administrativa;
+- secrets Google;
+- tokens administrativos.
 
-- arquivos-fonte: UTF-8;
-- PS1 para PowerShell 5.1: UTF-8 com BOM quando houver caracteres não ASCII;
-- preferir scripts ASCII quando possível;
-- não pedir edição manual de linhas;
-- quando arquivo mudar, entregar arquivo completo;
-- quando vários arquivos mudarem, preferir instalador único.
+## 7. Segurança
 
-## 7. Auth, RBAC e RLS
+Backend é a autoridade de permissão.
 
-Tabelas-base:
+Frontend pode ocultar ações, mas isso não substitui:
 
-- roles
-- permissions
-- role_permissions
-- profiles
+- RLS;
+- RBAC;
+- validação em RPC;
+- validação em Edge Function.
+
+Operações críticas devem registrar:
+
+- usuário;
+- data/hora;
+- ação;
+- antes/depois quando aplicável;
+- justificativa quando necessária.
+
+Agente:
+
+- token começa com `wti_`;
+- banco guarda hash SHA-256;
+- token é individual;
+- token pode ser rotacionado;
+- agente pode ser revogado;
+- MachineGuid impede reutilização indevida em outra máquina;
+- HTTPS obrigatório.
+
+Branding:
+
+- logomarca é pública por desenho, pois precisa aparecer antes do login e nas etiquetas;
+- escrita da logo exige `settings.manage`;
+- somente PNG;
+- limite de 2 MB;
+- arquivo público não contém informação sensível.
+
+## 8. RBAC
 
 Papéis:
 
@@ -219,13 +224,27 @@ Papéis:
 Permissões principais:
 
 - dashboard.view
-- assets.view/create/update/move/retire
-- stock.view/move/adjust
-- audits.view/create/execute/close
-- alerts.view/manage
-- locations.view/manage
-- users.view/manage
-- settings.view/manage
+- assets.view
+- assets.create
+- assets.update
+- assets.move
+- assets.retire
+- stock.view
+- stock.move
+- stock.adjust
+- audits.view
+- audits.create
+- audits.execute
+- audits.close
+- alerts.view
+- alerts.manage
+- locations.view
+- locations.manage
+- reports.view
+- users.view
+- users.manage
+- settings.view
+- settings.manage
 - logs.view
 
 Funções-base:
@@ -233,15 +252,7 @@ Funções-base:
 - `public.has_permission(text)`
 - `public.get_my_access_context()`
 
-Estado consolidado:
-
-- backend valida permissões;
-- frontend não é a camada exclusiva de autorização;
-- operações críticas geram audit_logs;
-- gestão administrativa de usuários fica em Edge Function;
-- alertas possuem tratamento auditado.
-
-## 8. Banco consolidado
+## 9. Banco consolidado
 
 M02:
 
@@ -290,13 +301,6 @@ M06:
 - evidence_categories
 - evidence_files
 
-M06 Edge Functions:
-
-- drive-health
-- evidence-upload
-- evidence-file
-- evidence-revoke
-
 M07:
 
 - maintenance_orders
@@ -319,14 +323,7 @@ M07 RPCs:
 M08:
 
 - system_settings
-
-M08 RPC:
-
 - `update_system_setting()`
-
-M08 Edge Function:
-
-- `admin-users`
 
 M09:
 
@@ -342,12 +339,49 @@ M09 RPCs:
 - `update_system_alert_status()`
 - `refresh_agent_connectivity_alerts()`
 
-M09 Edge Functions:
+M10:
 
-- `agent-admin`
-- `agent-ingest`
+- nova permissão `reports.view`;
+- bucket Storage `institution-branding`;
+- setting `branding.logo_path`;
+- `get_public_branding()`;
+- `get_dashboard_summary()`;
+- `get_operational_report(text)`.
 
-## 9. Patrimônio
+Migração M10:
+
+`supabase/migrations/20260826_170000_m10_consolidation_branding_reports.sql`
+
+Histórico SQL:
+
+`supabase/sql-history/M10_SUPABASE.sql`
+
+SQL M10 aplicado e funcionalmente validado no projeto oficial.
+
+## 10. Edge Functions
+
+M06:
+
+- drive-health
+- evidence-upload
+- evidence-file
+- evidence-revoke
+
+M08:
+
+- admin-users
+
+M09:
+
+- agent-admin
+- agent-ingest
+
+M10:
+
+- nenhuma nova Edge Function;
+- nenhum novo secret.
+
+## 11. Patrimônio
 
 Código:
 
@@ -364,50 +398,45 @@ Status:
 Funcionalidades:
 
 - cadastro;
-- busca/filtros;
 - edição;
-- ficha;
+- consulta;
+- filtros;
 - movimentação;
 - histórico;
-- QR Code;
 - componentes;
 - evidências;
+- QR Code;
+- etiqueta;
 - manutenção;
-- ciclo de vida;
 - baixa;
 - descarte;
+- agente;
 - inventário automático;
-- agente Windows;
-- divergências;
-- baseline esperado.
+- baseline;
+- divergências.
 
-Rota QR:
+QR:
 
 `/ativo/{asset_code}`
 
-## 10. Estoque e componentes
+## 12. Estoque
 
 Código:
 
 `WIS-CMP-{TIPO}-{000000}`
 
-Tabelas:
+Rastreabilidade:
 
-- stock_products
-- stock_units
-- asset_components
-- stock_movements
+- origem;
+- destino;
+- unidade;
+- ambiente;
+- instalação em ativo;
+- remoção;
+- mudança de status;
+- histórico não destrutivo.
 
-Regras:
-
-- histórico não destrutivo;
-- origem/destino;
-- vínculo componente ↔ máquina;
-- uma instalação ativa por peça;
-- ativos retired/disposed não recebem componentes;
-- descarte bloqueado enquanto houver componente instalado.
-
-## 11. Auditorias e QR
+## 13. Auditorias
 
 Código:
 
@@ -424,28 +453,17 @@ Resultados:
 
 Métodos:
 
-- qr
-- manual
-- file
-
-Scanner:
-
+- QR;
 - câmera;
 - imagem;
-- entrada manual;
-- URL `/ativo/{asset_code}`.
+- manual;
+- arquivo.
 
-## 12. Evidências M06
+## 14. Evidências
 
 Arquitetura oficial:
 
-React → Supabase Auth/RBAC → Supabase Edge Function → Google Apps Script → DriveApp → Google Drive.
-
-Decisões:
-
-- não usar Google Cloud Service Account;
-- não usar Drive API direta no frontend;
-- não tornar arquivo privado público para simplificar preview.
+React → Supabase Auth/RBAC → Edge Function → Google Apps Script → DriveApp → Google Drive.
 
 Categorias:
 
@@ -457,20 +475,17 @@ Categorias:
 - stock
 - other
 
-Limite operacional:
+Limite:
 
-5 MB por arquivo.
+5 MB.
 
 Revogação:
 
-- lógica e não destrutiva;
-- preserva metadados/histórico.
+- lógica;
+- não destrutiva;
+- preserva metadados.
 
-## 13. M07 — Manutenção e ciclo de vida
-
-Status:
-
-CONCLUÍDO E VALIDADO.
+## 15. Manutenção e ciclo de vida
 
 Códigos:
 
@@ -480,119 +495,80 @@ Códigos:
 Regras:
 
 - uma manutenção ativa por ativo;
-- abertura muda ativo para maintenance;
+- abertura coloca ativo em maintenance;
 - conclusão define status final;
 - cancelamento restaura ciclo;
-- baixa exige `assets.retire`;
 - descarte exige retired;
 - descarte bloqueado com componente instalado;
-- histórico não destrutivo.
+- histórico preservado.
 
-Frontend:
+Rotas:
 
 - `/manutencoes`
 - `/manutencoes/:maintenanceId`
-- MaintenancePage
-- MaintenanceDetailPage
-- MaintenanceCreateModal
-- AssetLifecyclePanel
-- maintenance-service
-- EvidencePanel
-- baixa/descarte
 
-## 14. M08 — Administração real
-
-Status:
-
-CONCLUÍDO E VALIDADO.
+## 16. Administração
 
 Usuários:
 
-- `/usuarios`;
-- listagem real;
-- convite;
-- alteração de papel;
-- ativação/desativação;
-- Edge Function `admin-users`;
-- auditoria `user.invite` e `user.update`.
+- convite real;
+- mudança de papel;
+- ativação;
+- desativação;
+- proteção contra remover último admin;
+- auditoria.
 
 Logs:
 
-- `/logs`;
-- consulta real de audit_logs;
-- filtros/busca;
-- old/new data;
+- audit_logs reais;
+- filtros;
+- before/after;
 - metadata.
 
 Configurações:
 
-- `/configuracoes`;
-- tabela `system_settings`;
-- RPC `update_system_setting()`;
-- auditoria `settings.update`.
+- system_settings;
+- identidade institucional;
+- logo;
+- parâmetros operacionais.
 
-## 15. M09 — Agente Windows e inventário automático
+## 17. Agente Windows
 
-Status:
+### 17.1 Projeto
 
-CONCLUÍDO E VALIDADO.
+Agente:
 
-### 15.1 Identidade e segurança do agente
+`agent/WisdomTI.Agent`
 
-Cada ativo pode possuir um agente ativo.
+Instalador gráfico:
 
-Credencial:
+`agent/WisdomTI.Agent.Setup`
 
-- prefixo `wti_`;
-- token aleatório individual;
-- banco armazena apenas hash SHA-256;
-- token exibido uma única vez;
-- rotação disponível;
-- revogação com justificativa;
-- um agente revogado não aceita novas coletas.
+Build:
 
-MachineGuid:
+`.NET 10`
 
-- primeira coleta vincula a credencial à máquina;
-- tentativa de usar a credencial em outro MachineGuid gera alerta de identidade e rejeita coleta.
+Runtime:
 
-O agente NÃO possui:
+`win-x64 self-contained`
 
-- service_role;
-- senha administrativa;
-- segredo Google;
-- acesso administrativo direto ao patrimônio.
+Instalador oficial:
 
-### 15.2 Comunicação
+`WisdomTI-Agent-Setup.exe`
 
-Endpoint:
+Fluxo normal:
 
-`agent-ingest`
+1. abrir ativo;
+2. criar/rotacionar token;
+3. copiar token;
+4. executar Setup EXE;
+5. aceitar UAC;
+6. colar token;
+7. instalar.
 
-Autenticação:
+PowerShell não faz parte do fluxo normal do usuário.
 
-header próprio:
-
-`x-wisdom-agent-token`
-
-Protocolo:
-
-versão `1`.
-
-Heartbeat:
-
-- tarefa Windows a cada 15 minutos;
-- tarefa no startup;
-- last_seen_at;
-- last_inventory_at.
-
-Conectividade:
-
-- pg_cron verifica agentes;
-- agente sem comunicação por mais de 30 minutos gera alerta;
-- retorno do heartbeat resolve automaticamente alerta de conectividade.
-
-### 15.3 Inventário coletado
+### 17.2 Coleta
 
 Máquina:
 
@@ -604,98 +580,54 @@ Máquina:
 
 Sistema:
 
-- nome do Windows;
+- Windows;
 - versão;
 - build;
 - arquitetura;
-- último boot.
+- boot.
 
 Hardware:
 
 - CPU;
-- número de núcleos;
+- cores;
 - processadores lógicos;
 - RAM.
 
 Armazenamento:
 
-- volumes locais;
-- letra/device id;
-- nome;
+- volume;
 - capacidade;
-- espaço livre;
-- espaço usado calculado no frontend;
-- volume do sistema.
+- livre;
+- usado;
+- disco de sistema.
 
 Software:
 
-- programas instalados;
+- nome;
 - versão;
-- fabricante/publisher;
-- fontes HKLM 64-bit;
-- HKLM WOW6432Node;
+- publisher;
+- HKLM 64-bit;
+- WOW6432Node;
 - HKCU;
 - deduplicação;
-- limite de 2000 entradas por snapshot.
+- limite de 2000.
 
-Histórico:
+### 17.3 Heartbeat
 
-- todo inventário vira novo registro em `agent_inventory_snapshots`;
-- snapshots anteriores não são apagados.
+Tarefas:
 
-### 15.4 Baseline e divergências
+- `Wisdom TI Agent - Startup`
+- `Wisdom TI Agent - Heartbeat`
 
-Tabela:
+Heartbeat:
 
-`agent_inventory_expectations`
+15 minutos.
 
-Baseline:
+Offline:
 
-- hostname;
-- fabricante;
-- modelo;
-- serial;
-- SO;
-- CPU;
-- RAM;
-- mínimo de espaço livre do disco do sistema;
-- software obrigatório.
+mais de 30 minutos sem comunicação.
 
-Frontend:
-
-botão `Adotar inventário detectado`.
-
-Divergências:
-
-- identity;
-- hardware;
-- software;
-- health.
-
-Exemplos:
-
-- hostname divergente;
-- serial divergente;
-- fabricante/modelo divergente;
-- CPU divergente;
-- RAM divergente;
-- SO divergente;
-- espaço livre crítico;
-- software obrigatório ausente.
-
-Regras:
-
-- divergência aberta é reutilizada/atualizada;
-- ao voltar ao esperado, divergência é auto-resolvida;
-- alerta associado é auto-resolvido quando aplicável.
-
-### 15.5 Alertas reais
-
-Página:
-
-`/alertas`
-
-A antiga fonte mock foi substituída por `system_alerts`.
+### 17.4 Alertas
 
 Categorias:
 
@@ -705,157 +637,186 @@ Categorias:
 - software
 - health
 
-Severidades:
-
-- info
-- warning
-- critical
-
 Status:
 
 - open
 - acknowledged
 - resolved
 
-Operações:
+## 18. M10 — Identidade institucional
 
-- reconhecer;
-- resolver;
-- justificativa;
-- auditoria `alert.status.update`.
+Nome genérico:
 
-### 15.6 Frontend do agente
+`Inventário TI`
+
+Contexto:
+
+`src/branding/BrandContext.tsx`
+
+Serviço:
+
+`src/branding/branding-service.ts`
+
+Marca dinâmica:
+
+`src/components/brand/WisdomMark.tsx`
+
+Administração:
+
+`src/pages/SettingsPage.tsx`
+
+Storage:
+
+bucket `institution-branding`
+
+Objeto:
+
+`institution/logo.png`
+
+Regras:
+
+- PNG;
+- máximo 2 MB;
+- leitura pública;
+- insert/update/delete somente com `settings.manage`.
+
+RPC público:
+
+`get_public_branding()`
+
+Expõe somente:
+
+- product_name;
+- organization_name;
+- support_email;
+- logo_path;
+- updated_at.
+
+Não expõe configurações administrativas ou secrets.
+
+Uso:
+
+- login;
+- sidebar/menu;
+- cabeçalhos apropriados;
+- etiqueta patrimonial.
+
+## 19. Etiqueta patrimonial M10
 
 Componente:
 
-`src/components/agents/AssetAgentPanel.tsx`
+`src/components/assets/AssetQrLabelCard.tsx`
 
-Integrado à ficha do ativo.
+A etiqueta imprime:
 
-Exibe:
-
-- status Online/Sem comunicação;
-- hostname;
-- token prefix;
-- versão;
-- último heartbeat;
-- SO/build;
-- CPU;
-- RAM;
-- arquitetura;
+- logo institucional quando configurada;
+- nome da instituição;
+- Inventário TI;
+- código patrimonial;
+- QR Code;
+- tipo do ativo;
 - fabricante/modelo;
-- serial;
-- armazenamento;
-- programas instalados;
+- serial quando existente.
+
+Formato de impressão preparado para etiqueta compacta.
+
+Fallback sem logo continua funcional.
+
+## 20. Dashboard real M10
+
+Página:
+
+`src/pages/DashboardPage.tsx`
+
+Serviço:
+
+`getDashboardSummary()`
+
+RPC:
+
+`get_dashboard_summary()`
+
+Indicadores:
+
+- total de ativos;
+- ativos em operação;
+- estoque;
+- manutenções;
+- auditorias;
+- alertas;
+- agentes online/offline;
 - divergências;
-- baseline;
-- criar/rotacionar/revogar agente.
+- ativos sem localização;
+- saúde operacional;
+- alertas recentes;
+- manutenções recentes.
 
-## 16. M09 V2 UX — instalação simplificada
+Não usar mock no dashboard concluído.
 
-Status:
+## 21. Relatórios M10
 
-CONCLUÍDO E VALIDADO.
+Rota:
 
-Problema resolvido:
+`/relatorios`
 
-o primeiro fluxo exigia extração de ZIP e PowerShell administrativo na máquina-alvo.
+Página:
 
-Fluxo oficial após V2:
+`src/pages/ReportsPage.tsx`
 
-1. No Wisdom TI, abrir o ativo.
-2. Criar ou rotacionar token.
-3. Copiar token.
-4. Levar `WisdomTI-Agent-Setup.exe` para a máquina.
-5. Dar dois cliques.
-6. Autorizar UAC.
-7. Colar token no formulário.
-8. Clicar Instalar.
-9. Instalador executa toda configuração.
-10. Primeira coleta é enviada automaticamente.
+Permissão:
 
-Não é necessário abrir PowerShell no fluxo normal.
+`reports.view`
 
-Projeto:
+RPC:
 
-`agent/WisdomTI.Agent.Setup`
+`get_operational_report(text)`
 
-Tecnologia:
+Relatórios:
 
-- C#/.NET 10;
-- WinForms;
-- WinExe;
-- self-contained win-x64;
-- manifest `requireAdministrator`;
-- payload `WisdomTI.Agent.exe` embutido como resource.
+- assets;
+- stock;
+- audits;
+- maintenance;
+- alerts;
+- agents.
 
-O instalador gráfico:
+Funcionalidades:
 
-- valida token;
-- extrai agente;
-- cria `%ProgramData%\WisdomTI\Agent`;
-- grava configuração;
-- aplica ACL para SYSTEM/Administradores;
-- cria tarefa Startup;
-- cria tarefa Heartbeat a cada 15 minutos;
-- executa primeira coleta;
-- mostra sucesso/erro em interface gráfica.
+- consulta;
+- filtro/busca;
+- tabela responsiva;
+- exportação CSV UTF-8;
+- limite backend de 5000 registros por execução.
 
-Arquivo universal:
+## 22. PWA e preparação Cloudflare
 
-`WisdomTI-Agent-Setup.exe`
+Nome PWA:
 
-O mesmo executável pode ser usado em todos os computadores.
+`Inventário TI`
 
-O token NÃO fica embutido no instalador universal.
+Arquivos principais:
 
-PowerShell permanece apenas como fallback técnico.
+- `vite.config.ts`
+- `public/inventario-ti.svg`
+- `public/_redirects`
 
-## 17. Arquivos principais M09
+SPA fallback:
 
-Frontend:
+`/* /index.html 200`
 
-- src/types/agent.ts
-- src/data/agent-service.ts
-- src/components/agents/AssetAgentPanel.tsx
-- src/pages/AlertsPage.tsx
-- src/pages/AssetDetailPage.tsx
+Code splitting:
 
-Backend:
+- React;
+- Supabase;
+- QR.
 
-- supabase/functions/agent-admin/index.ts
-- supabase/functions/agent-ingest/index.ts
+A publicação real em Cloudflare Pages ainda não foi executada.
 
-Banco:
+Documento:
 
-- supabase/migrations/20260826_150000_m09_agent_inventory_alerts.sql
-- supabase/sql-history/M09_SUPABASE.sql
+`docs/M10_DEPLOY_CLOUDFLARE.md`
 
-Agente:
-
-- agent/WisdomTI.Agent/WisdomTI.Agent.csproj
-- agent/WisdomTI.Agent/Program.cs
-
-Instalador gráfico:
-
-- agent/WisdomTI.Agent.Setup/WisdomTI.Agent.Setup.csproj
-- agent/WisdomTI.Agent.Setup/Program.cs
-- agent/WisdomTI.Agent.Setup/app.manifest
-
-Scripts:
-
-- agent/scripts/BUILD_AGENT_PACKAGE.ps1
-- agent/scripts/INSTALL_AGENT.ps1
-- agent/scripts/UNINSTALL_AGENT.ps1
-- scripts/DEPLOY_M09_BACKEND.ps1
-- scripts/VALIDAR_M09.ps1
-
-Documentação:
-
-- docs/M09_TESTS.md
-- docs/M09_V2_UX.md
-
-## 18. Rotas atuais
+## 23. Rotas atuais
 
 - /login
 - /dashboard
@@ -870,190 +831,119 @@ Documentação:
 - /manutencoes/:maintenanceId
 - /alertas
 - /ambientes
+- /relatorios
 - /usuarios
 - /logs
 - /configuracoes
 - /sem-permissao
 
-## 19. Pendências reais depois do M09
+## 24. Testes M10 realizados
 
-Dashboard:
+M10 foi validado funcionalmente pelo usuário.
 
-- estrutura existe;
-- partes ainda usam mock;
-- deve ser conectado a dados reais no M10.
+Validações:
 
-Relatórios:
+- instalação macrobloco OK;
+- TypeScript build OK;
+- Vite build OK;
+- lint sem erros bloqueantes;
+- SQL M10 aplicado;
+- branding funcional;
+- logo PNG funcional;
+- identidade no aplicativo;
+- etiqueta personalizada funcional;
+- dashboard real funcional;
+- relatórios funcionais;
+- busca de relatórios funcional;
+- CSV funcional;
+- regressão operacional aceita;
+- resultado final: `M10 FUNCIONAL OK`.
 
-- faltam relatórios gerenciais consolidados;
-- patrimônio;
-- estoque;
-- auditoria;
-- manutenção;
-- inventário automático;
-- alertas.
-
-Produção:
-
-- Cloudflare Pages;
-- PWA final;
-- domínio/HTTPS;
-- code splitting;
-- hardening;
-- assinatura digital do instalador/agente;
-- estratégia de atualização automática do agente;
-- retenção/compactação de snapshots;
-- monitoramento operacional;
-- processo formal de backup/restore.
-
-## 20. Avisos técnicos
-
-Vite:
-
-- pode emitir warning de chunks maiores que 500 kB;
-- não é bloqueante;
-- code splitting será tratado no M10.
-
-ESLint:
-
-- existem warnings preexistentes em Edge Functions antigas;
-- 0 errors;
-- limpeza fica para hardening.
+## 25. Bugs conhecidos / observações
 
 Agente:
 
-- executável ainda não possui assinatura digital;
-- Windows SmartScreen pode alertar em máquinas novas;
-- assinatura de código deve ser feita antes da distribuição ampla em produção.
+- ainda sem assinatura digital;
+- SmartScreen pode alertar;
+- atualização automática do agente ainda não implementada.
 
-Agente atual:
+PWA:
 
-- build win-x64;
-- considerar ARM64 apenas se houver demanda real.
+- manifest usa identidade genérica Inventário TI;
+- nome/logo da instituição são carregados dinamicamente após iniciar o app.
 
-## 21. Próximo marco — M10
+Relatórios:
 
-M10 — Consolidação operacional, identidade institucional e produção.
+- limite atual de 5000 registros por execução;
+- paginação/exportação em lote pode ser adicionada se escala exigir.
 
-### Identidade institucional / white-label
+Branding:
 
-Decisão de produto:
+- apenas PNG;
+- limite 2 MB;
+- substituir a logo reutiliza o mesmo objeto público com versionamento por query string.
 
-- o nome genérico padrão do aplicativo passa a ser `Inventário TI`;
-- nomes anteriores de produto não devem permanecer como marca principal da interface;
-- a instituição usuária poderá personalizar sua identidade em Administração → Configurações.
+Cloudflare:
 
-Configurações de identidade:
+- ainda não publicado em produção.
 
-- nome de exibição da instituição;
-- logomarca PNG;
-- e-mail de suporte e demais dados institucionais já configuráveis;
-- demais informações institucionais que forem necessárias ao produto.
+## 26. Próximo marco — M11
 
-Logo:
+M11 — Produção + hardening final.
 
-- upload PNG pelo administrador;
-- permissão `settings.manage`;
-- validação de tipo e tamanho;
-- armazenamento controlado no backend;
-- nenhuma credencial administrativa no frontend;
-- a logo institucional é considerada informação pública de apresentação e poderá ser carregada inclusive antes do login;
-- prever fallback para a marca genérica `Inventário TI` quando não houver logo configurada.
+Macroescopo:
 
-Uso da identidade:
-
-- login;
-- navegação/layout principal;
-- cabeçalhos adequados;
-- etiquetas patrimoniais/QR Code;
-- impressão/exportação de etiquetas;
-- telas/documentos institucionais relevantes.
-
-Etiquetas:
-
-- devem exibir, quando configurados:
-  - logomarca;
-  - nome da instituição;
-  - código patrimonial;
-  - QR Code;
-  - identificação essencial do ativo;
-- preservar legibilidade em impressoras térmicas e impressão A4;
-- prever versão sem logo quando a configuração estiver ausente.
-
-Arquitetura recomendada:
-
-- não usar Google Drive autenticado para a logo principal, porque ela precisa aparecer também antes do login;
-- criar backend específico de branding público, com escrita protegida por `settings.manage`;
-- limitar logo a PNG otimizado e tamanho pequeno;
-- manter nome genérico `Inventário TI` como fallback técnico e visual.
-
-### Demais macroescopos M10
-
-1. Dashboard real:
-   - ativos;
-   - estoque;
-   - auditorias;
-   - manutenção;
-   - alertas;
-   - agentes online/offline;
-   - divergências;
-   - indicadores operacionais.
-
-2. Relatórios:
-   - patrimônio;
-   - inventário;
-   - componentes;
-   - movimentações;
-   - auditorias;
-   - manutenções;
-   - alertas;
-   - agente/inventário automático;
-   - exportações adequadas.
-
-3. Hardening:
-   - code splitting;
-   - tratamento de warnings;
-   - estados de erro/loading;
-   - revisão de RLS/RBAC;
-   - limites;
-   - rate limiting onde necessário;
-   - retenção de snapshots;
-   - logs.
-
-4. Produção:
-   - Cloudflare Pages;
-   - PWA;
-   - HTTPS/domínio;
-   - configuração de ambiente;
-   - processo de deploy;
+1. Cloudflare Pages:
+   - conectar GitHub;
+   - configurar build;
+   - cadastrar variáveis frontend;
+   - domínio;
+   - HTTPS;
+   - deploy;
+   - rollback;
    - smoke tests.
 
-5. Agente para produção:
+2. PWA:
+   - instalação real;
+   - atualização;
+   - cache;
+   - offline controlado;
+   - câmera/QR em HTTPS.
+
+3. Hardening:
+   - revisão RLS/RBAC;
+   - revisão Storage;
+   - CSP/headers;
+   - tratamento de erros;
+   - rate limiting onde aplicável;
+   - retenção de snapshots;
+   - observabilidade;
+   - backups/restore.
+
+4. Agente:
    - assinatura digital;
-   - versão;
-   - mecanismo de atualização;
+   - versionamento formal;
+   - estratégia de update;
    - distribuição;
-   - documentação operacional.
+   - documentação para técnicos.
 
-6. Continuidade:
-   - atualizar integralmente este MASTER_CONTEXT;
-   - commit/push final da etapa;
-   - preparar documentação de operação.
+5. Produção:
+   - smoke tests completos;
+   - checklist operacional;
+   - documentação de implantação;
+   - atualização final deste MASTER_CONTEXT.
 
-## 22. Retomada
+## 27. Retomada
 
-Ao abrir novo chat, ler primeiro:
+Ao iniciar novo chat:
 
-`C:\Projetos\TI Wisdom\wisdom-ti\docs\MASTER_CONTEXT.md`
+1. ler `docs/MASTER_CONTEXT.md`;
+2. considerar M01–M10 concluídos;
+3. não reconstruir módulos anteriores sem regressão concreta;
+4. Supabase oficial é `dqfbzsneaamihfphjfcj`;
+5. produto genérico é `Inventário TI`;
+6. branding institucional é configurável;
+7. agente Windows está funcional;
+8. dashboard e relatórios usam dados reais;
+9. próximo marco é M11 — publicação/hardening.
 
-Considerar:
-
-- M01–M09 concluídos;
-- Supabase oficial: `dqfbzsneaamihfphjfcj`;
-- M09 possui agente Windows real e validado;
-- instalação oficial é gráfica por `WisdomTI-Agent-Setup.exe`;
-- PowerShell não faz parte do fluxo normal de instalação do agente;
-- armazenamento e softwares são exibidos na ficha;
-- alertas são reais, não mock;
-- próximo trabalho: M10;
-- não reconstruir etapas anteriores sem regressão concreta.

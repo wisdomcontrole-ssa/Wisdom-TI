@@ -3,6 +3,7 @@ import {
   QrCode as QrCodeIcon,
 } from 'lucide-react'
 import QRCode from 'react-qr-code'
+import { useBranding } from '../../branding/BrandContext'
 import type { AssetRecord } from '../../types/assets'
 
 export function AssetQrLabelCard({
@@ -12,11 +13,14 @@ export function AssetQrLabelCard({
   asset: AssetRecord
   typeName: string
 }) {
-  const qrTarget = `${window.location.origin}/ativo/${asset.asset_code}`
+  const { branding } = useBranding()
+  const qrTarget =
+    `${window.location.origin}/ativo/${asset.asset_code}`
   const labelId = `asset-label-${asset.id}`
 
   function printLabel() {
-    const label = document.getElementById(labelId)
+    const label =
+      document.getElementById(labelId)
 
     if (!label) {
       return
@@ -37,7 +41,7 @@ export function AssetQrLabelCard({
       <html lang="pt-BR">
       <head>
         <meta charset="utf-8" />
-        <title>${asset.asset_code}</title>
+        <title>${escapeHtml(asset.asset_code)}</title>
         <style>
           @page { size: 60mm 35mm; margin: 0; }
           html, body {
@@ -47,36 +51,53 @@ export function AssetQrLabelCard({
             height: 35mm;
             font-family: Arial, Helvetica, sans-serif;
           }
-          .wisdom-label {
+          .inventory-label {
             box-sizing: border-box;
             width: 60mm;
             height: 35mm;
-            padding: 3mm;
+            padding: 2.5mm;
             display: grid;
-            grid-template-columns: 25mm 1fr;
-            gap: 3mm;
+            grid-template-columns: 24mm 1fr;
+            gap: 2.5mm;
             align-items: center;
+            overflow: hidden;
             border: 0.25mm solid #d1d5db;
           }
+          .qr-wrap {
+            padding: 0 !important;
+          }
           .qr-wrap svg {
-            width: 24mm !important;
-            height: 24mm !important;
+            width: 23mm !important;
+            height: 23mm !important;
+          }
+          .label-logo {
+            display: block;
+            max-width: 25mm;
+            max-height: 5.5mm;
+            object-fit: contain;
+            object-position: left center;
+            margin-bottom: 1mm;
           }
           .brand {
-            font-size: 8pt;
+            font-size: 6.5pt;
             font-weight: 800;
-            letter-spacing: .08em;
+            line-height: 1.05;
+          }
+          .product {
+            margin-top: .5mm;
+            font-size: 5.5pt;
+            color: #6b7280;
           }
           .code {
-            margin-top: 2mm;
+            margin-top: 1.3mm;
             font-family: Consolas, monospace;
-            font-size: 10pt;
+            font-size: 9pt;
             font-weight: 800;
           }
           .desc {
-            margin-top: 1.5mm;
-            font-size: 7pt;
-            line-height: 1.25;
+            margin-top: 1mm;
+            font-size: 6.2pt;
+            line-height: 1.2;
           }
           button { display: none !important; }
         </style>
@@ -85,8 +106,10 @@ export function AssetQrLabelCard({
         ${label.outerHTML}
         <script>
           window.addEventListener('load', () => {
-            window.print();
-            window.setTimeout(() => window.close(), 400);
+            window.setTimeout(() => {
+              window.print();
+              window.setTimeout(() => window.close(), 500);
+            }, 250);
           });
         </script>
       </body>
@@ -116,7 +139,7 @@ export function AssetQrLabelCard({
 
       <div
         id={labelId}
-        className="wisdom-label mt-4 grid grid-cols-[150px_1fr] items-center gap-4 rounded-2xl border border-slate-200 p-4"
+        className="inventory-label mt-4 grid grid-cols-[150px_1fr] items-center gap-4 rounded-2xl border border-slate-200 p-4"
       >
         <div className="qr-wrap rounded-xl bg-white p-2">
           <QRCode
@@ -132,9 +155,24 @@ export function AssetQrLabelCard({
         </div>
 
         <div className="min-w-0">
-          <div className="brand text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-            Wisdom TI
+          {branding.logoUrl && (
+            <img
+              src={branding.logoUrl}
+              alt=""
+              className="label-logo mb-2 max-h-10 max-w-[160px] object-contain object-left"
+            />
+          )}
+
+          <div className="brand text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
+            {branding.organizationName ||
+              branding.productName}
           </div>
+
+          {branding.organizationName && (
+            <div className="product mt-1 text-[9px] font-semibold text-slate-400">
+              {branding.productName}
+            </div>
+          )}
 
           <div className="code mt-2 break-all font-mono text-sm font-black text-slate-950">
             {asset.asset_code}
@@ -145,7 +183,9 @@ export function AssetQrLabelCard({
             {asset.manufacturer
               ? ` · ${asset.manufacturer}`
               : ''}
-            {asset.model ? ` ${asset.model}` : ''}
+            {asset.model
+              ? ` ${asset.model}`
+              : ''}
           </div>
 
           {asset.serial_number && (
@@ -161,4 +201,13 @@ export function AssetQrLabelCard({
       </div>
     </section>
   )
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
 }

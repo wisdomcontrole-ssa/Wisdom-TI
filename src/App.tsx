@@ -20,6 +20,7 @@ import { LoginPage } from './pages/LoginPage'
 import { LogsPage } from './pages/LogsPage'
 import { MaintenanceDetailPage } from './pages/MaintenanceDetailPage'
 import { MaintenancePage } from './pages/MaintenancePage'
+import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StockDetailPage } from './pages/StockDetailPage'
 import { UnauthorizedPage } from './pages/UnauthorizedPage'
@@ -136,6 +137,17 @@ export default function App() {
             <Route
               path="/ambientes"
               element={<LocationsPage />}
+            />
+          </Route>
+
+          <Route
+            element={
+              <ProtectedRoute permission="reports.view" />
+            }
+          >
+            <Route
+              path="/relatorios"
+              element={<ReportsPage />}
             />
           </Route>
 

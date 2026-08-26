@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Bell,
   Boxes,
   ClipboardCheck,
@@ -11,7 +12,9 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
-import type { PermissionCode } from '../../types/auth'
+import type {
+  PermissionCode,
+} from '../../types/auth'
 
 export interface NavigationItem {
   label: string
@@ -68,6 +71,12 @@ export const mainNavigation: NavigationItem[] = [
     path: '/ambientes',
     icon: MapPin,
     permission: 'locations.view',
+  },
+  {
+    label: 'Relatórios',
+    path: '/relatorios',
+    icon: BarChart3,
+    permission: 'reports.view',
   },
 ]
 
