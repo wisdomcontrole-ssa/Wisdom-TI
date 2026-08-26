@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   MapPin,
   Monitor,
+  ScrollText,
   Settings,
   Users,
   Wrench,
@@ -76,6 +77,12 @@ export const adminNavigation: NavigationItem[] = [
     path: '/usuarios',
     icon: Users,
     permission: 'users.view',
+  },
+  {
+    label: 'Logs',
+    path: '/logs',
+    icon: ScrollText,
+    permission: 'logs.view',
   },
   {
     label: 'Configurações',

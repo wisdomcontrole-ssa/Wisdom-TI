@@ -16,9 +16,10 @@ import { BackendSetupPage } from './pages/BackendSetupPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { InventoryPage } from './pages/InventoryPage'
 import { LocationsPage } from './pages/LocationsPage'
+import { LoginPage } from './pages/LoginPage'
+import { LogsPage } from './pages/LogsPage'
 import { MaintenanceDetailPage } from './pages/MaintenanceDetailPage'
 import { MaintenancePage } from './pages/MaintenancePage'
-import { LoginPage } from './pages/LoginPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StockDetailPage } from './pages/StockDetailPage'
 import { UnauthorizedPage } from './pages/UnauthorizedPage'
@@ -76,13 +77,6 @@ export default function App() {
               path="/ativo/:assetCode"
               element={<AssetCodePage />}
             />
-          </Route>
-
-          <Route
-            element={
-              <ProtectedRoute permission="assets.view" />
-            }
-          >
             <Route
               path="/manutencoes"
               element={<MaintenancePage />}
@@ -153,6 +147,17 @@ export default function App() {
             <Route
               path="/usuarios"
               element={<UsersPage />}
+            />
+          </Route>
+
+          <Route
+            element={
+              <ProtectedRoute permission="logs.view" />
+            }
+          >
+            <Route
+              path="/logs"
+              element={<LogsPage />}
             />
           </Route>
 

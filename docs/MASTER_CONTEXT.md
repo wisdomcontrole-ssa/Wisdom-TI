@@ -2,69 +2,93 @@
 
 ## 1. Estado atual
 
-Projeto: Wisdom TI
+Projeto: Wisdom TI.
 
-Marco atual concluído e validado:
-
-M07 — Manutenção, ciclo de vida e descarte.
-
-Marcos concluídos e preservados:
-
-- M01 — Fundação visual e estrutural;
-- M02 — Supabase, autenticação, RBAC e RLS;
-- correção global de encoding / PowerShell 5.1;
-- M03 — Unidades, ambientes e patrimônio;
-- M04 — Estoque e componentes;
-- M05 — Auditorias físicas e QR Code;
-- M06 — Fotos, evidências e Google Drive;
-- M07 — Manutenção, ciclo de vida e descarte.
-
-Validação M07:
-
-- banco aplicado e validado anteriormente;
-- M07 Frontend V3 instalado;
-- arquivos e integrações V3 confirmados;
-- npm run build: OK;
-- npm run lint: OK;
-- validação funcional concluída no fluxo do projeto;
-- nenhum bug bloqueante de M07 foi reportado no fechamento.
-
-Não reconstruir M01-M07 sem evidência concreta de regressão.
-
-Próximo marco:
+Marco concluído e validado:
 
 M08 — Administração real: usuários, perfis/permissões, logs e configurações.
 
-## 2. Ambiente e repositório
+Marcos concluídos:
+
+- M01 — Fundação visual e estrutural.
+- M02 — Supabase, Auth, RBAC e RLS.
+- M03 — Unidades, ambientes e patrimônio.
+- M04 — Estoque e componentes.
+- M05 — Auditorias físicas e QR Code.
+- M06 — Fotos/evidências e Google Drive.
+- M07 — Manutenção, ciclo de vida e descarte.
+- M08 — Administração real.
+
+Validação M08:
+
+- banco M08 aplicado no projeto Supabase correto;
+- Edge Function `admin-users` publicada;
+- build OK;
+- lint OK, com warnings não bloqueantes preexistentes nas Edge Functions M06;
+- usuários OK;
+- convite/alteração de papel/ativação OK;
+- configurações OK;
+- logs OK;
+- regressão rápida M01–M07 OK;
+- status final: M08 OK.
+
+Não reconstruir M01–M08 sem evidência concreta de regressão.
+
+Próximo marco:
+
+M09 — Agente Windows + inventário automático + heartbeat + divergências + alertas reais.
+
+## 2. Repositório e ambiente
 
 Projeto local:
 
-C:\Projetos\TI Wisdom\wisdom-ti
+`C:\Projetos\TI Wisdom\wisdom-ti`
 
 Backups externos:
 
-C:\Projetos\TI Wisdom\_backups\wisdom-ti
+`C:\Projetos\TI Wisdom\_backups\wisdom-ti`
 
-Downloads:
+Repositório:
 
-$env:USERPROFILE\Downloads
-
-GitHub:
-
-https://github.com/wisdomcontrole-ssa/Wisdom-TI.git
+`https://github.com/wisdomcontrole-ssa/Wisdom-TI.git`
 
 Branch principal:
 
-main
+`main`
 
-Regra de versionamento:
+Ambiente:
 
-- GitHub é a fonte de versionamento entre computadores;
-- antes de novas etapas, verificar git status e sincronização;
-- ao concluir etapa aprovada: build, lint, testes, git add, commit e push;
-- nunca usar force push no fluxo normal.
+- Windows;
+- VS Code;
+- Windows PowerShell 5.1;
+- Git/GitHub;
+- Node/npm;
+- Supabase CLI.
 
-## 3. Stack definida
+Regras Git:
+
+- verificar branch, remote e `git status` antes de cada macrobloco;
+- ao concluir macrobloco: build, lint, testes, commit e push;
+- não usar force push no fluxo normal;
+- preservar trabalho local e backups externos.
+
+## 3. Supabase oficial
+
+Project Ref oficial do Wisdom TI:
+
+`dqfbzsneaamihfphjfcj`
+
+Project URL:
+
+`https://dqfbzsneaamihfphjfcj.supabase.co`
+
+Regra permanente:
+
+- toda Edge Function, SQL, `.env.local` e deploy do Wisdom TI deve apontar para esse Project Ref;
+- não inferir o projeto por nome exibido na CLI;
+- ao preparar novo computador, conferir a URL do projeto antes de configurar chave pública.
+
+## 4. Stack
 
 Frontend/PWA:
 
@@ -75,8 +99,8 @@ Frontend/PWA:
 - React Router;
 - Lucide;
 - vite-plugin-pwa;
-- html5-qrcode 2.3.8;
-- react-qr-code 2.2.0.
+- html5-qrcode;
+- react-qr-code.
 
 Backend:
 
@@ -84,159 +108,102 @@ Backend:
 - Supabase Auth;
 - RLS;
 - RBAC;
-- RPCs PostgreSQL para operações críticas;
+- RPCs PostgreSQL;
 - Supabase Edge Functions.
 
-Fotos/evidências:
+Evidências:
 
 - Google Drive;
 - Google Apps Script;
 - DriveApp;
 - Supabase Edge Functions como ponte segura.
 
+Agente planejado:
+
+- C#/.NET para Windows.
+
 Hospedagem planejada:
 
 - Cloudflare Pages.
 
-Agente Windows planejado:
-
-- C#/.NET;
-- inventário automático;
-- heartbeat;
-- comparação esperado x detectado;
-- alertas de hardware, software e saúde.
-
-Ambiente local:
-
-- VS Code;
-- PowerShell 5.1 / Windows;
-- Git / GitHub;
-- Node/npm.
-
-## 4. Regras permanentes de construção
-
-- trabalhar em etapas grandes e funcionais;
-- usar PowerShell pronto para copiar/executar;
-- scripts e instaladores devem ser executados diretamente de Downloads;
-- PowerShell deve criar/substituir estruturas automaticamente;
-- não pedir edição manual de trechos;
-- quando um arquivo mudar, entregar o arquivo completo;
-- quando vários arquivos mudarem, preferir instalador único;
-- executar build/lint/testes ao final de cada etapa;
-- não avançar de grande etapa sem validação;
-- antes de gerar código dependente da estrutura atual, ler este MASTER_CONTEXT;
-- manter compatibilidade Windows/PowerShell;
-- operações de campo devem ser mobile-first;
-- administração, estoque, relatórios e cadastros extensos devem aproveitar desktop;
-- manter histórico não destrutivo;
-- operações críticas devem registrar usuário, data/hora, ação, valores e justificativa quando aplicável;
-- permissões devem ser garantidas no backend, não somente na interface.
-
-## 5. Encoding / PowerShell
-
-Aplicação:
-
-- arquivos-fonte em UTF-8.
-
-PowerShell 5.1:
-
-- PS1 com caracteres não ASCII deve usar UTF-8 com BOM;
-- preferir ASCII em instaladores quando possível;
-- não entregar PS1 acentuado em UTF-8 sem BOM.
-
-Histórico:
-
-- houve mojibake causado por PowerShell 5.1;
-- a correção de encoding é permanente.
-
-## 6. Segurança e variáveis de ambiente
+## 5. Segurança e variáveis de ambiente
 
 Frontend:
 
-- VITE_SUPABASE_URL
-- VITE_SUPABASE_PUBLISHABLE_KEY
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-Supabase Edge Functions M06:
+Valores reais ficam apenas em `.env.local`, que deve permanecer fora do Git.
 
-- GOOGLE_APPS_SCRIPT_URL
-- GOOGLE_APPS_SCRIPT_SHARED_SECRET
+M06 Edge Functions:
 
-Google Apps Script / Script Properties:
+- `GOOGLE_APPS_SCRIPT_URL`
+- `GOOGLE_APPS_SCRIPT_SHARED_SECRET`
 
-- WISDOM_SHARED_SECRET
-- WISDOM_ROOT_FOLDER_ID
+Google Apps Script:
+
+- `WISDOM_SHARED_SECRET`
+- `WISDOM_ROOT_FOLDER_ID`
 
 Regras:
 
 - nunca registrar valores reais de secrets;
-- .env.local contém valores locais reais e não deve ser exposto;
-- nunca colocar service_role, secret key, senha PostgreSQL, tokens administrativos ou credenciais Google administrativas no frontend ou agente;
-- credenciais administrativas devem permanecer exclusivamente em backend/infraestrutura segura;
-- o segredo Apps Script nunca é enviado ao navegador.
+- nunca colocar `service_role`, secret key, senha PostgreSQL ou token administrativo no frontend ou agente;
+- Publishable/anon pública pode existir no frontend;
+- credenciais administrativas ficam somente em backend/infraestrutura;
+- o agente futuro deve ter identidade própria e revogável, sem credencial administrativa.
 
-## 7. Autenticação, RBAC e RLS
+## 6. Encoding e PowerShell
 
-Supabase Auth:
+- arquivos-fonte: UTF-8;
+- PS1 para PowerShell 5.1: UTF-8 com BOM quando houver caracteres não ASCII;
+- preferir scripts ASCII quando possível;
+- não pedir edição manual de linhas;
+- quando arquivo mudar, entregar o arquivo completo;
+- quando vários arquivos mudarem, preferir um instalador único.
 
-- login email/senha;
-- sessão persistente;
-- logout;
-- rotas protegidas.
+## 7. Auth, RBAC e RLS
 
-Tabelas:
+Tabelas-base:
 
-- roles;
-- permissions;
-- role_permissions;
-- profiles.
+- `roles`
+- `permissions`
+- `role_permissions`
+- `profiles`
 
 Papéis:
 
-- admin;
-- manager;
-- technician;
-- auditor;
-- viewer.
+- admin
+- manager
+- technician
+- auditor
+- viewer
 
 Permissões principais:
 
 - dashboard.view
-- assets.view
-- assets.create
-- assets.update
-- assets.move
-- assets.retire
-- stock.view
-- stock.move
-- stock.adjust
-- audits.view
-- audits.create
-- audits.execute
-- audits.close
-- alerts.view
-- alerts.manage
-- locations.view
-- locations.manage
-- users.view
-- users.manage
-- settings.view
-- settings.manage
+- assets.view/create/update/move/retire
+- stock.view/move/adjust
+- audits.view/create/execute/close
+- alerts.view/manage
+- locations.view/manage
+- users.view/manage
+- settings.view/manage
 - logs.view
 
 Funções-base:
 
-- public.has_permission(text)
-- public.get_my_access_context()
+- `public.has_permission(text)`
+- `public.get_my_access_context()`
 
-Estado atual de administração:
+Após M08:
 
-- backend RBAC/RLS existe;
-- UsersPage consulta profiles/roles;
-- gestão administrativa completa de usuários ainda será concluída no M08;
-- audit_logs existe no backend, mas ainda não há módulo administrativo completo de logs;
-- SettingsPage atual ainda é estrutural/estática.
+- alterações privilegiadas de usuários passam pela Edge Function `admin-users`;
+- React não recebe credencial administrativa;
+- `audit_logs` possui módulo administrativo real;
+- `system_settings` possui leitura por RLS e escrita por RPC segura.
 
-## 8. Banco consolidado até M07
+## 8. Banco consolidado
 
 M02:
 
@@ -254,7 +221,7 @@ M03:
 - assets
 - asset_movements
 - asset_code_seq
-- move_asset()
+- `move_asset()`
 
 M04:
 
@@ -263,10 +230,10 @@ M04:
 - asset_components
 - stock_movements
 - stock_unit_code_seq
-- install_stock_unit()
-- remove_stock_unit()
-- move_stock_unit()
-- change_stock_unit_status()
+- `install_stock_unit()`
+- `remove_stock_unit()`
+- `move_stock_unit()`
+- `change_stock_unit_status()`
 
 M05:
 
@@ -274,11 +241,11 @@ M05:
 - audit_items
 - audit_scan_events
 - audit_cycle_code_seq
-- create_physical_audit()
-- register_audit_scan()
-- update_audit_item_note()
-- close_physical_audit()
-- cancel_physical_audit()
+- `create_physical_audit()`
+- `register_audit_scan()`
+- `update_audit_item_note()`
+- `close_physical_audit()`
+- `cancel_physical_audit()`
 
 M06:
 
@@ -302,140 +269,95 @@ M07:
 
 M07 RPCs:
 
-- create_maintenance_order()
-- update_maintenance_order()
-- add_maintenance_part()
-- remove_maintenance_part()
-- complete_maintenance_order()
-- cancel_maintenance_order()
-- retire_asset()
-- dispose_asset()
+- `create_maintenance_order()`
+- `update_maintenance_order()`
+- `add_maintenance_part()`
+- `remove_maintenance_part()`
+- `complete_maintenance_order()`
+- `cancel_maintenance_order()`
+- `retire_asset()`
+- `dispose_asset()`
+
+M08:
+
+- system_settings
+
+M08 RPC:
+
+- `update_system_setting()`
+
+M08 Edge Function:
+
+- `admin-users`
+
+M08 índices:
+
+- system_settings_group_idx
+- audit_logs_created_at_idx
+- audit_logs_action_idx
+- audit_logs_entity_type_idx
 
 ## 9. Patrimônio
 
-Código patrimonial:
+Código:
 
-WIS-{TIPO}-{000000}
-
-Exemplos:
-
-- WIS-DT-000001
-- WIS-MON-000002
-- WIS-NB-000003
+`WIS-{TIPO}-{000000}`
 
 Status:
 
-- active;
-- stock;
-- maintenance;
-- retired;
-- disposed.
+- active
+- stock
+- maintenance
+- retired
+- disposed
 
 Funcionalidades:
 
 - cadastro;
-- busca e filtros;
+- busca/filtros;
 - edição;
 - ficha;
 - movimentação;
 - histórico;
 - QR Code;
-- componentes instalados;
+- componentes;
 - evidências;
 - manutenção;
 - ciclo de vida;
 - baixa;
 - descarte.
 
-Movimentação:
+Rota QR estável:
 
-- histórico não destrutivo;
-- origem/destino;
-- usuário;
-- data/hora;
-- justificativa;
-- RPC move_asset().
+`/ativo/{asset_code}`
 
-Rota patrimonial estável:
-
-/ativo/{asset_code}
-
-## 10. Localizações
-
-Tabelas:
-
-- units;
-- environments.
-
-Regras:
-
-- ambiente pertence a uma unidade;
-- inativação em vez de exclusão operacional;
-- backend valida relação;
-- operações críticas auditadas.
-
-Frontend:
-
-- página de ambientes/unidades integrada ao Supabase.
-
-## 11. Estoque e componentes
-
-Tabelas:
-
-- stock_products;
-- stock_units;
-- asset_components;
-- stock_movements.
-
-Código físico:
-
-WIS-CMP-{TIPO}-{000000}
-
-Condição:
-
-- new
-- used
-- refurbished
-- damaged
-
-Status:
-
-- in_stock
-- reserved
-- installed
-- maintenance
-- disposed
-
-Regras:
-
-- uma instalação ativa por peça;
-- histórico anterior preservado;
-- retirada encerra instalação;
-- origem/destino preservados;
-- vínculo componente ↔ máquina;
-- ativos retired/disposed não recebem novos componentes;
-- descarte de ativo é bloqueado enquanto houver componentes instalados.
-
-M06 adicionou evidências de estoque.
-
-M07 reutiliza estoque/asset_components para peças e manutenção.
-
-## 12. Auditorias físicas e QR Code
-
-Tabelas:
-
-- audit_cycles;
-- audit_items;
-- audit_scan_events.
+## 10. Estoque e componentes
 
 Código:
 
-AUD-{ANO}-{000000}
+`WIS-CMP-{TIPO}-{000000}`
 
-Escopo:
+Tabelas:
 
-- unidade inteira;
-- ambiente específico.
+- stock_products
+- stock_units
+- asset_components
+- stock_movements
+
+Regras:
+
+- histórico não destrutivo;
+- origem/destino;
+- vínculo componente ↔ máquina;
+- uma instalação ativa por peça;
+- ativos retired/disposed não recebem componentes;
+- descarte bloqueado enquanto houver componente instalado.
+
+## 11. Auditorias e QR
+
+Código:
+
+`AUD-{ANO}-{000000}`
 
 Resultados:
 
@@ -444,7 +366,7 @@ Resultados:
 - missing
 - divergent
 - extra
-- unknown_code para scan
+- unknown_code
 
 Métodos:
 
@@ -454,66 +376,22 @@ Métodos:
 
 Scanner:
 
-- html5-qrcode 2.3.8;
-- câmera com preferência environment;
-- leitura de imagem;
+- câmera;
+- imagem;
 - entrada manual;
-- URL /ativo/{asset_code} ou código patrimonial.
+- URL `/ativo/{asset_code}`.
 
-Fechamento:
-
-- pending esperado vira missing;
-- ciclo fica closed;
-- histórico preservado.
-
-M06 adicionou:
-
-- evidência geral de auditoria;
-- evidência por audit_item;
-- câmera/galeria/arquivo;
-- preview protegido;
-- Drive;
-- histórico preservado.
-
-## 13. Fotos e evidências M06
+## 12. Evidências M06
 
 Arquitetura oficial:
 
-React
-→ Supabase Auth/RBAC
-→ Supabase Edge Function
-→ Google Apps Script Web App
-→ DriveApp
-→ Google Drive
+React → Supabase Auth/RBAC → Supabase Edge Function → Google Apps Script → DriveApp → Google Drive.
 
-Decisão permanente:
+Decisões permanentes:
 
 - não usar Google Cloud Service Account;
-- não usar Google Drive API direta no frontend;
-- não usar GOOGLE_SERVICE_ACCOUNT_JSON_B64;
-- não tornar arquivos privados públicos para simplificar preview.
-
-Google Drive raiz:
-
-Wisdom TI
-
-Estrutura base:
-
-Wisdom TI
-├── Ativos
-├── Auditorias
-├── Estoque
-└── Documentos Gerais
-
-Pastas de ativo:
-
-Ativos/{asset_code}/
-├── Cadastro
-├── Auditoria
-├── Movimentacao
-├── Manutencao
-├── Descarte
-└── Outros
+- não usar Drive API direta no frontend;
+- não tornar arquivo privado público para simplificar preview.
 
 Categorias:
 
@@ -525,348 +403,326 @@ Categorias:
 - stock
 - other
 
-Tipos suportados:
-
-- image/jpeg
-- image/png
-- image/webp
-- image/heic
-- image/heif
-- application/pdf
-
-Limite operacional atual:
+Limite operacional:
 
 5 MB por arquivo.
 
-Frontend:
-
-- câmera;
-- galeria;
-- seleção de arquivo;
-- compressão JPEG/PNG/WEBP;
-- preview autenticado;
-- abrir no Drive;
-- revogação lógica com justificativa.
-
 Revogação:
 
-- não destrutiva;
-- arquivo/metadado preservado para histórico;
-- status/revoked_at/revoked_by/reason registrados.
+- lógica e não destrutiva;
+- preserva metadados/histórico.
 
-## 14. M07 — Manutenção, ciclo de vida e descarte
+## 13. M07 — Manutenção e ciclo de vida
 
 Status:
 
 CONCLUÍDO E VALIDADO.
 
-Banco:
-
-- maintenance_orders;
-- maintenance_parts;
-- maintenance_events;
-- asset_lifecycle_events;
-- asset_disposals.
-
 Códigos:
 
-- manutenção: MAN-{ANO}-{000000};
-- descarte: DSC-{ANO}-{000000}.
+- `MAN-{ANO}-{000000}`
+- `DSC-{ANO}-{000000}`
 
-Regras principais:
+Regras:
 
 - uma manutenção ativa por ativo;
-- abrir manutenção muda o ativo para maintenance;
-- atualização preserva histórico;
-- conclusão define status final do ativo;
-- cancelamento restaura o ciclo;
-- baixa exige assets.retire;
-- descarte exige ativo previamente retired;
-- descarte é bloqueado se houver componentes instalados;
-- ativo retired/disposed não recebe novos componentes;
-- histórico de ciclo de vida é não destrutivo.
+- abertura muda ativo para maintenance;
+- conclusão define status final;
+- cancelamento restaura ciclo;
+- baixa exige `assets.retire`;
+- descarte exige retired;
+- descarte bloqueado com componente instalado;
+- histórico não destrutivo.
 
-Frontend M07 V3:
+Frontend:
 
-- rota /manutencoes;
-- rota /manutencoes/:maintenanceId;
-- MaintenancePage;
-- MaintenanceDetailPage;
-- MaintenanceCreateModal;
-- AssetLifecyclePanel;
-- maintenance-service;
-- tipos de manutenção;
-- integração na ficha do ativo;
-- histórico/ciclo de vida;
-- peças e materiais;
-- reutilização do EvidencePanel do M06;
-- baixa;
-- descarte.
+- `/manutencoes`
+- `/manutencoes/:maintenanceId`
+- MaintenancePage
+- MaintenanceDetailPage
+- MaintenanceCreateModal
+- AssetLifecyclePanel
+- maintenance-service
+- EvidencePanel
+- baixa/descarte
 
-Arquivos principais:
+## 14. M08 — Administração real
 
-- src/types/maintenance.ts
-- src/data/maintenance-service.ts
-- src/components/maintenance/MaintenanceCreateModal.tsx
-- src/components/maintenance/AssetLifecyclePanel.tsx
-- src/pages/MaintenancePage.tsx
-- src/pages/MaintenanceDetailPage.tsx
-- src/components/evidence/EvidencePanel.tsx
-- src/pages/AssetDetailPage.tsx
-- src/pages/AssetsPage.tsx
+Status:
+
+CONCLUÍDO E VALIDADO.
+
+### Usuários
+
+Rota:
+
+`/usuarios`
+
+Frontend:
+
+- listagem real de profiles/roles;
+- busca;
+- convite;
+- alteração de papel;
+- ativação/desativação.
+
+Backend:
+
+Edge Function `admin-users`.
+
+Ações:
+
+- invite
+- update
+
+Regras:
+
+- requer `users.manage`;
+- convite usa Supabase Auth Admin somente na Edge Function;
+- usuário não pode desativar o próprio acesso;
+- último administrador ativo não pode ser removido/desativado;
+- alterações registradas em audit_logs.
+
+Eventos:
+
+- user.invite
+- user.update
+
+### Logs
+
+Rota:
+
+`/logs`
+
+Permissão:
+
+`logs.view`
+
+Funcionalidades:
+
+- consulta de audit_logs;
+- busca;
+- filtro por entidade;
+- ator;
+- data/hora;
+- old_data;
+- new_data;
+- metadata.
+
+### Configurações
+
+Rota:
+
+`/configuracoes`
+
+Tabela:
+
+`system_settings`
+
+Permissões:
+
+- settings.view
+- settings.manage
+
+Parâmetros iniciais:
+
+- organization.display_name
+- organization.support_email
+- operations.timezone
+- auth.invite_redirect_url
+
+Escrita:
+
+`update_system_setting()`
+
+Evento:
+
+- settings.update
+
+Segurança:
+
+- somente parâmetros operacionais não sensíveis;
+- nenhuma secret key/service_role;
+- alteração auditada;
+- URL de convite exige HTTPS ou localhost.
+
+### Arquivos M08
+
+- src/types/admin.ts
+- src/data/admin-service.ts
+- src/pages/UsersPage.tsx
+- src/pages/LogsPage.tsx
+- src/pages/SettingsPage.tsx
 - src/components/layout/navigation.ts
 - src/App.tsx
+- supabase/functions/admin-users/index.ts
+- supabase/migrations/20260826_110000_m08_administration.sql
+- supabase/sql-history/M08_SUPABASE.sql
+- docs/M08_TESTS.md
+- docs/M08_V2_FIX.md
+- scripts/VALIDAR_M08.ps1
+- scripts/DEPLOY_M08_BACKEND.ps1
 
-Banco/documentação M07:
+### Correção M08 V2
 
-- supabase/migrations/20260825_093600_m07_maintenance_lifecycle.sql
-- supabase/sql-history/M07_SUPABASE.sql
-- supabase/sql-history/M07_VALIDAR.sql
-- docs/M07_FRONTEND_TESTS.md
-- docs/M07_FRONTEND_V2_FIX.md
-- docs/M07_FRONTEND_V3_FIX.md
-- scripts/VALIDAR_M07_FRONTEND.ps1
+A V1 passou build e falhou no lint React 19 com `react-hooks/set-state-in-effect`.
 
-Validação técnica final:
+V2:
 
-- arquivos M07 V3 presentes: OK;
-- navegação e integrações: OK;
-- build: OK;
-- lint: OK;
-- validação funcional: concluída;
-- SQL M07 não deve ser reexecutado sem evidência de problema.
+- bootstraps assíncronos canceláveis;
+- modais sem sincronização de estado por efeito;
+- nenhuma regra ESLint desabilitada;
+- build OK;
+- lint 0 errors;
+- warnings antigos das Edge Functions M06 permanecem não bloqueantes.
 
 ## 15. Rotas atuais
 
-/login
-/dashboard
-/patrimonio
-/patrimonio/:assetId
-/ativo/:assetCode
-/estoque
-/estoque/:stockUnitId
-/auditorias
-/auditorias/:auditId
-/manutencoes
-/manutencoes/:maintenanceId
-/alertas
-/ambientes
-/usuarios
-/configuracoes
-/sem-permissao
+- /login
+- /dashboard
+- /patrimonio
+- /patrimonio/:assetId
+- /ativo/:assetCode
+- /estoque
+- /estoque/:stockUnitId
+- /auditorias
+- /auditorias/:auditId
+- /manutencoes
+- /manutencoes/:maintenanceId
+- /alertas
+- /ambientes
+- /usuarios
+- /logs
+- /configuracoes
+- /sem-permissao
 
-## 16. Estado real das áreas ainda incompletas
+## 16. Pendências reais
 
 Alertas:
 
-- rota e UI existem;
-- AlertsPage ainda consome src/data/mock.ts;
-- não existe ainda backend real de alertas do agente.
+- rota/UI existe;
+- ainda usa mock;
+- será substituído no M09.
 
 Dashboard:
 
-- estrutura visual existe desde M01;
-- partes operacionais ainda usam dados mock;
-- será conectado a dados reais após os módulos administrativos/agente necessários.
-
-Usuários:
-
-- Auth/RBAC/RLS existem desde M02;
-- UsersPage lista profiles com roles;
-- gestão administrativa completa ainda falta.
-
-Configurações:
-
-- página existe;
-- opções atuais são estruturais/estáticas;
-- configuração operacional real ainda falta.
-
-Logs:
-
-- audit_logs existe;
-- não existe ainda uma experiência administrativa completa para consulta/filtro.
+- estrutura existe;
+- partes ainda usam mock;
+- será conectado a dados reais após M09.
 
 Agente Windows:
 
 - ainda não implementado;
-- será desenvolvido em C#/.NET;
-- deve inventariar hardware/software, enviar heartbeat e gerar divergências/alertas.
+- próximo macrobloco.
 
-## 17. Testes concluídos
+Relatórios e consolidação:
 
-M01:
+- pendentes após M09.
 
-- interface base funcional.
+Deploy final:
 
-M02:
+- Cloudflare Pages, hardening, code splitting e PWA final depois dos módulos funcionais principais.
 
-- Supabase;
-- login/sessão/logout;
-- rotas protegidas;
-- RBAC;
-- RLS;
-- build/lint.
+## 17. Próximo marco — M09
 
-M03:
+M09 — Agente Windows + inventário automático + heartbeat + divergências + alertas reais.
 
-- unidades;
-- ambientes;
-- patrimônio;
-- código automático;
-- ficha;
-- edição;
-- movimentação;
-- histórico;
-- build/lint.
+Macroescopo:
 
-M04:
+1. Backend:
+   - agentes/dispositivos;
+   - credencial própria e revogável;
+   - heartbeat;
+   - snapshots de inventário;
+   - hardware;
+   - software;
+   - saúde;
+   - divergências;
+   - alertas;
+   - histórico.
 
-- estoque;
-- entrada;
-- transferência;
-- instalação;
-- retirada;
-- condição/status;
-- histórico;
-- componente ↔ máquina;
-- build/lint.
+2. Agente C#/.NET:
+   - instalação/configuração;
+   - identidade da máquina;
+   - coleta hardware/software;
+   - envio periódico;
+   - retry/offline;
+   - logs locais;
+   - HTTPS;
+   - nenhuma credencial administrativa.
 
-M05:
+3. Comparação esperado x detectado:
+   - vínculo com ativo;
+   - CPU/RAM/discos/serial;
+   - componentes;
+   - software;
+   - divergências.
 
-- QR;
-- etiqueta;
-- auditoria;
-- snapshot;
-- scanner;
-- found/divergent/extra/unknown/missing;
-- fechamento;
-- histórico;
-- build/lint.
+4. Alertas reais:
+   - substituir mock;
+   - severidade;
+   - status;
+   - categoria;
+   - origem;
+   - ativo/agente;
+   - reconhecimento/resolução;
+   - auditoria.
 
-M06:
+5. Integração:
+   - ficha do ativo recebe inventário automático;
+   - dashboard passa a usar indicadores reais onde aplicável.
 
-- Apps Script;
-- Supabase Edge Functions;
-- drive-health;
-- upload;
-- preview;
-- Drive;
-- revogação;
-- auditoria;
-- estoque;
-- câmera/galeria/arquivo;
-- compactação;
-- build/lint.
+## 18. Decisões arquiteturais M09
 
-M07:
+O agente NÃO deve:
 
-- banco: OK;
-- frontend V3: OK;
-- navegação/integrações: OK;
-- build: OK;
-- lint: OK;
-- fluxo funcional: validado;
-- status final: M07 OK.
+- usar service_role;
+- usar senha administrativa;
+- alterar patrimônio diretamente;
+- acessar Google Drive diretamente.
 
-## 18. Avisos técnicos e pendências não bloqueantes
+O agente deve:
 
-Vite:
+- autenticar-se com identidade própria e revogável;
+- ter credencial individual;
+- permitir revogação;
+- usar HTTPS;
+- registrar last_seen_at;
+- usar protocolo versionado;
+- ter escopo mínimo.
 
-Some chunks are larger than 500 kB after minification.
+O backend decide:
 
-Tratamento:
+- vínculo agente ↔ ativo;
+- divergências;
+- criação/atualização de alertas;
+- reconhecimento/resolução.
 
-- warning não bloqueante;
-- não misturar code splitting com correções funcionais;
-- otimização será feita antes do deploy final.
+## 19. Depois do M09
 
-Apps Script:
+M10 — Consolidação operacional e produção:
 
-- sujeito às cotas do Google Apps Script;
-- manter 5 MB por arquivo na ponte atual;
-- continuar compressão de imagens no frontend.
+- dashboard real;
+- relatórios;
+- indicadores;
+- code splitting;
+- hardening;
+- PWA final;
+- Cloudflare Pages;
+- domínio/HTTPS;
+- processo de backup;
+- preparação white-label.
 
-PWA/deploy:
+## 20. Retomada
 
-- Cloudflare Pages permanece planejado;
-- HTTPS será necessário para câmera em produção;
-- hardening, code splitting e configuração final de deploy ainda pendentes.
+Ao abrir novo chat, ler primeiro:
 
-White-label:
-
-- será preparado antes do deploy final;
-- não tratar antes dos módulos funcionais restantes.
-
-## 19. Próximo marco — M08
-
-M08 — Administração real: usuários, perfis/permissões, logs e configurações.
-
-Objetivo:
-
-- transformar a administração atual em módulo operacional real;
-- manter secrets administrativos fora do frontend;
-- concluir gestão de usuários sem expor service_role;
-- permitir alteração controlada de perfil/role e estado ativo;
-- registrar alterações críticas em audit_logs;
-- oferecer consulta/filtros de logs;
-- tornar Configurações funcional para parâmetros seguros;
-- preservar RBAC/RLS e trilha de auditoria.
-
-Princípio de segurança:
-
-qualquer operação que exija Supabase Admin API/service_role deve ocorrer somente em Edge Function/backend seguro, nunca no React.
-
-Depois do M08:
-
-M09 — Agente Windows + inventário automático + heartbeat + alertas reais.
-
-Depois:
-
-- dashboard/indicadores totalmente reais;
-- relatórios e consolidação operacional;
-- hardening/PWA/deploy Cloudflare Pages;
-- preparação white-label/replicação.
-
-## 20. Próxima etapa de implementação
-
-Antes de gerar M08:
-
-1. confirmar repositório limpo após commit/push M07;
-2. ler este MASTER_CONTEXT;
-3. considerar M01-M07 concluídos;
-4. não alterar SQL M07;
-5. mapear exatamente os arquivos M08 que serão afetados;
-6. entregar banco/Edge Functions/frontend em etapa grande e coerente;
-7. finalizar com build/lint/testes e atualização deste documento.
-
-## 21. Retomada em novo chat
-
-Ler primeiro:
-
-C:\Projetos\TI Wisdom\wisdom-ti\docs\MASTER_CONTEXT.md
+`C:\Projetos\TI Wisdom\wisdom-ti\docs\MASTER_CONTEXT.md`
 
 Considerar:
 
-- M01-M07 concluídos;
-- M07 banco e frontend validados;
-- não reconstruir etapas anteriores sem regressão real;
-- próximo trabalho: M08 — Administração real.
-
-Manter obrigatoriamente:
-
-- Windows;
-- PowerShell;
-- Downloads;
-- scripts completos;
-- arquivos completos;
-- Supabase SQL somente no SQL Editor;
-- Google Drive via Apps Script;
-- sem Google Cloud Service Account;
-- backups externos;
-- UTF-8;
-- PS1 UTF-8 BOM;
-- RBAC/RLS;
-- histórico não destrutivo;
-- mobile-first em campo;
-- segurança administrativa no backend;
-- nenhuma credencial administrativa no frontend.
+- M01–M08 concluídos;
+- Supabase oficial: `dqfbzsneaamihfphjfcj`;
+- M08 banco, Edge Function e frontend validados;
+- próximo trabalho: M09;
+- não reconstruir etapas anteriores sem regressão concreta.
