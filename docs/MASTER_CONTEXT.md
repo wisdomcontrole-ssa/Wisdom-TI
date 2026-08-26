@@ -4,9 +4,9 @@
 
 Projeto: Wisdom TI.
 
-Marco concluído e validado:
+Marco atual concluído e validado:
 
-M08 — Administração real: usuários, perfis/permissões, logs e configurações.
+M09 — Agente Windows + inventário automático + heartbeat + divergências + alertas reais.
 
 Marcos concluídos:
 
@@ -18,25 +18,43 @@ Marcos concluídos:
 - M06 — Fotos/evidências e Google Drive.
 - M07 — Manutenção, ciclo de vida e descarte.
 - M08 — Administração real.
+- M09 — Agente Windows, inventário automático, divergências e alertas reais.
+- M09 V2 UX — instalador gráfico universal + visualização de armazenamento e softwares.
 
-Validação M08:
+Validação M09:
 
-- banco M08 aplicado no projeto Supabase correto;
-- Edge Function `admin-users` publicada;
-- build OK;
-- lint OK, com warnings não bloqueantes preexistentes nas Edge Functions M06;
-- usuários OK;
-- convite/alteração de papel/ativação OK;
-- configurações OK;
-- logs OK;
-- regressão rápida M01–M07 OK;
-- status final: M08 OK.
+- SQL M09 aplicado no Supabase oficial;
+- Edge Function `agent-admin` publicada;
+- Edge Function `agent-ingest` publicada;
+- frontend build OK;
+- lint OK com warnings não bloqueantes preexistentes;
+- agente .NET 10 build OK;
+- pacote Windows gerado;
+- agente real instalado em Windows;
+- heartbeat real recebido;
+- agente exibido Online na ficha do ativo;
+- sistema operacional coletado;
+- CPU coletada;
+- RAM coletada;
+- hostname coletado;
+- fabricante/modelo/serial coletados;
+- volumes/discos coletados;
+- softwares instalados coletados;
+- divergência real criada;
+- alertas reais integrados;
+- token individual funcionando;
+- rotação/revogação disponíveis;
+- instalador gráfico validado;
+- fluxo normal de instalação sem PowerShell na máquina-alvo;
+- armazenamento detalhado exibido;
+- programas instalados exibidos e pesquisáveis;
+- status final: M09 OK.
 
-Não reconstruir M01–M08 sem evidência concreta de regressão.
+Não reconstruir M01–M09 sem evidência concreta de regressão.
 
 Próximo marco:
 
-M09 — Agente Windows + inventário automático + heartbeat + divergências + alertas reais.
+M10 — Consolidação operacional e produção.
 
 ## 2. Repositório e ambiente
 
@@ -47,6 +65,10 @@ Projeto local:
 Backups externos:
 
 `C:\Projetos\TI Wisdom\_backups\wisdom-ti`
+
+Builds externos:
+
+`C:\Projetos\TI Wisdom\_builds\wisdom-ti-agent`
 
 Repositório:
 
@@ -63,18 +85,20 @@ Ambiente:
 - Windows PowerShell 5.1;
 - Git/GitHub;
 - Node/npm;
-- Supabase CLI.
+- Supabase CLI;
+- .NET 10 SDK.
 
 Regras Git:
 
 - verificar branch, remote e `git status` antes de cada macrobloco;
 - ao concluir macrobloco: build, lint, testes, commit e push;
 - não usar force push no fluxo normal;
-- preservar trabalho local e backups externos.
+- preservar trabalho local;
+- artefatos de build não devem ser versionados.
 
 ## 3. Supabase oficial
 
-Project Ref oficial do Wisdom TI:
+Project Ref oficial:
 
 `dqfbzsneaamihfphjfcj`
 
@@ -84,9 +108,9 @@ Project URL:
 
 Regra permanente:
 
-- toda Edge Function, SQL, `.env.local` e deploy do Wisdom TI deve apontar para esse Project Ref;
-- não inferir o projeto por nome exibido na CLI;
-- ao preparar novo computador, conferir a URL do projeto antes de configurar chave pública.
+- toda Edge Function, SQL, `.env.local` e deploy deve apontar para esse projeto;
+- não inferir projeto por nome mostrado pela CLI;
+- não usar outros Project Refs do mesmo usuário.
 
 ## 4. Stack
 
@@ -109,7 +133,8 @@ Backend:
 - RLS;
 - RBAC;
 - RPCs PostgreSQL;
-- Supabase Edge Functions.
+- Supabase Edge Functions;
+- pg_cron para verificação periódica de conectividade do agente.
 
 Evidências:
 
@@ -118,9 +143,16 @@ Evidências:
 - DriveApp;
 - Supabase Edge Functions como ponte segura.
 
-Agente planejado:
+Agente Windows:
 
-- C#/.NET para Windows.
+- C#/.NET 10;
+- executável self-contained win-x64;
+- instalador gráfico WinForms self-contained;
+- coleta via Windows PowerShell/CIM internamente;
+- heartbeat;
+- inventário de hardware/software;
+- identidade por MachineGuid;
+- token individual revogável.
 
 Hospedagem planejada:
 
@@ -133,7 +165,7 @@ Frontend:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-Valores reais ficam apenas em `.env.local`, que deve permanecer fora do Git.
+Valores reais ficam apenas em `.env.local`, fora do Git.
 
 M06 Edge Functions:
 
@@ -150,8 +182,13 @@ Regras:
 - nunca registrar valores reais de secrets;
 - nunca colocar `service_role`, secret key, senha PostgreSQL ou token administrativo no frontend ou agente;
 - Publishable/anon pública pode existir no frontend;
-- credenciais administrativas ficam somente em backend/infraestrutura;
-- o agente futuro deve ter identidade própria e revogável, sem credencial administrativa.
+- credenciais administrativas ficam somente no backend/infraestrutura;
+- o agente usa credencial própria, individual e revogável;
+- token do agente não deve ser enviado por chat/e-mail;
+- banco guarda hash SHA-256 da credencial do agente;
+- token pode ser rotacionado ou revogado;
+- MachineGuid protege contra uso da mesma credencial em outra máquina;
+- HTTPS obrigatório para comunicação do agente.
 
 ## 6. Encoding e PowerShell
 
@@ -159,17 +196,17 @@ Regras:
 - PS1 para PowerShell 5.1: UTF-8 com BOM quando houver caracteres não ASCII;
 - preferir scripts ASCII quando possível;
 - não pedir edição manual de linhas;
-- quando arquivo mudar, entregar o arquivo completo;
-- quando vários arquivos mudarem, preferir um instalador único.
+- quando arquivo mudar, entregar arquivo completo;
+- quando vários arquivos mudarem, preferir instalador único.
 
 ## 7. Auth, RBAC e RLS
 
 Tabelas-base:
 
-- `roles`
-- `permissions`
-- `role_permissions`
-- `profiles`
+- roles
+- permissions
+- role_permissions
+- profiles
 
 Papéis:
 
@@ -196,12 +233,13 @@ Funções-base:
 - `public.has_permission(text)`
 - `public.get_my_access_context()`
 
-Após M08:
+Estado consolidado:
 
-- alterações privilegiadas de usuários passam pela Edge Function `admin-users`;
-- React não recebe credencial administrativa;
-- `audit_logs` possui módulo administrativo real;
-- `system_settings` possui leitura por RLS e escrita por RPC segura.
+- backend valida permissões;
+- frontend não é a camada exclusiva de autorização;
+- operações críticas geram audit_logs;
+- gestão administrativa de usuários fica em Edge Function;
+- alertas possuem tratamento auditado.
 
 ## 8. Banco consolidado
 
@@ -290,12 +328,24 @@ M08 Edge Function:
 
 - `admin-users`
 
-M08 índices:
+M09:
 
-- system_settings_group_idx
-- audit_logs_created_at_idx
-- audit_logs_action_idx
-- audit_logs_entity_type_idx
+- agent_devices
+- agent_inventory_expectations
+- agent_inventory_snapshots
+- agent_divergences
+- system_alerts
+
+M09 RPCs:
+
+- `set_asset_inventory_expectation()`
+- `update_system_alert_status()`
+- `refresh_agent_connectivity_alerts()`
+
+M09 Edge Functions:
+
+- `agent-admin`
+- `agent-ingest`
 
 ## 9. Patrimônio
 
@@ -325,9 +375,13 @@ Funcionalidades:
 - manutenção;
 - ciclo de vida;
 - baixa;
-- descarte.
+- descarte;
+- inventário automático;
+- agente Windows;
+- divergências;
+- baseline esperado.
 
-Rota QR estável:
+Rota QR:
 
 `/ativo/{asset_code}`
 
@@ -387,7 +441,7 @@ Arquitetura oficial:
 
 React → Supabase Auth/RBAC → Supabase Edge Function → Google Apps Script → DriveApp → Google Drive.
 
-Decisões permanentes:
+Decisões:
 
 - não usar Google Cloud Service Account;
 - não usar Drive API direta no frontend;
@@ -452,131 +506,356 @@ Status:
 
 CONCLUÍDO E VALIDADO.
 
-### Usuários
+Usuários:
 
-Rota:
-
-`/usuarios`
-
-Frontend:
-
-- listagem real de profiles/roles;
-- busca;
+- `/usuarios`;
+- listagem real;
 - convite;
 - alteração de papel;
-- ativação/desativação.
+- ativação/desativação;
+- Edge Function `admin-users`;
+- auditoria `user.invite` e `user.update`.
 
-Backend:
+Logs:
 
-Edge Function `admin-users`.
-
-Ações:
-
-- invite
-- update
-
-Regras:
-
-- requer `users.manage`;
-- convite usa Supabase Auth Admin somente na Edge Function;
-- usuário não pode desativar o próprio acesso;
-- último administrador ativo não pode ser removido/desativado;
-- alterações registradas em audit_logs.
-
-Eventos:
-
-- user.invite
-- user.update
-
-### Logs
-
-Rota:
-
-`/logs`
-
-Permissão:
-
-`logs.view`
-
-Funcionalidades:
-
-- consulta de audit_logs;
-- busca;
-- filtro por entidade;
-- ator;
-- data/hora;
-- old_data;
-- new_data;
+- `/logs`;
+- consulta real de audit_logs;
+- filtros/busca;
+- old/new data;
 - metadata.
 
-### Configurações
+Configurações:
 
-Rota:
+- `/configuracoes`;
+- tabela `system_settings`;
+- RPC `update_system_setting()`;
+- auditoria `settings.update`.
 
-`/configuracoes`
+## 15. M09 — Agente Windows e inventário automático
+
+Status:
+
+CONCLUÍDO E VALIDADO.
+
+### 15.1 Identidade e segurança do agente
+
+Cada ativo pode possuir um agente ativo.
+
+Credencial:
+
+- prefixo `wti_`;
+- token aleatório individual;
+- banco armazena apenas hash SHA-256;
+- token exibido uma única vez;
+- rotação disponível;
+- revogação com justificativa;
+- um agente revogado não aceita novas coletas.
+
+MachineGuid:
+
+- primeira coleta vincula a credencial à máquina;
+- tentativa de usar a credencial em outro MachineGuid gera alerta de identidade e rejeita coleta.
+
+O agente NÃO possui:
+
+- service_role;
+- senha administrativa;
+- segredo Google;
+- acesso administrativo direto ao patrimônio.
+
+### 15.2 Comunicação
+
+Endpoint:
+
+`agent-ingest`
+
+Autenticação:
+
+header próprio:
+
+`x-wisdom-agent-token`
+
+Protocolo:
+
+versão `1`.
+
+Heartbeat:
+
+- tarefa Windows a cada 15 minutos;
+- tarefa no startup;
+- last_seen_at;
+- last_inventory_at.
+
+Conectividade:
+
+- pg_cron verifica agentes;
+- agente sem comunicação por mais de 30 minutos gera alerta;
+- retorno do heartbeat resolve automaticamente alerta de conectividade.
+
+### 15.3 Inventário coletado
+
+Máquina:
+
+- MachineGuid;
+- hostname;
+- fabricante;
+- modelo;
+- serial.
+
+Sistema:
+
+- nome do Windows;
+- versão;
+- build;
+- arquitetura;
+- último boot.
+
+Hardware:
+
+- CPU;
+- número de núcleos;
+- processadores lógicos;
+- RAM.
+
+Armazenamento:
+
+- volumes locais;
+- letra/device id;
+- nome;
+- capacidade;
+- espaço livre;
+- espaço usado calculado no frontend;
+- volume do sistema.
+
+Software:
+
+- programas instalados;
+- versão;
+- fabricante/publisher;
+- fontes HKLM 64-bit;
+- HKLM WOW6432Node;
+- HKCU;
+- deduplicação;
+- limite de 2000 entradas por snapshot.
+
+Histórico:
+
+- todo inventário vira novo registro em `agent_inventory_snapshots`;
+- snapshots anteriores não são apagados.
+
+### 15.4 Baseline e divergências
 
 Tabela:
 
-`system_settings`
+`agent_inventory_expectations`
 
-Permissões:
+Baseline:
 
-- settings.view
-- settings.manage
+- hostname;
+- fabricante;
+- modelo;
+- serial;
+- SO;
+- CPU;
+- RAM;
+- mínimo de espaço livre do disco do sistema;
+- software obrigatório.
 
-Parâmetros iniciais:
+Frontend:
 
-- organization.display_name
-- organization.support_email
-- operations.timezone
-- auth.invite_redirect_url
+botão `Adotar inventário detectado`.
 
-Escrita:
+Divergências:
 
-`update_system_setting()`
+- identity;
+- hardware;
+- software;
+- health.
 
-Evento:
+Exemplos:
 
-- settings.update
+- hostname divergente;
+- serial divergente;
+- fabricante/modelo divergente;
+- CPU divergente;
+- RAM divergente;
+- SO divergente;
+- espaço livre crítico;
+- software obrigatório ausente.
 
-Segurança:
+Regras:
 
-- somente parâmetros operacionais não sensíveis;
-- nenhuma secret key/service_role;
-- alteração auditada;
-- URL de convite exige HTTPS ou localhost.
+- divergência aberta é reutilizada/atualizada;
+- ao voltar ao esperado, divergência é auto-resolvida;
+- alerta associado é auto-resolvido quando aplicável.
 
-### Arquivos M08
+### 15.5 Alertas reais
 
-- src/types/admin.ts
-- src/data/admin-service.ts
-- src/pages/UsersPage.tsx
-- src/pages/LogsPage.tsx
-- src/pages/SettingsPage.tsx
-- src/components/layout/navigation.ts
-- src/App.tsx
-- supabase/functions/admin-users/index.ts
-- supabase/migrations/20260826_110000_m08_administration.sql
-- supabase/sql-history/M08_SUPABASE.sql
-- docs/M08_TESTS.md
-- docs/M08_V2_FIX.md
-- scripts/VALIDAR_M08.ps1
-- scripts/DEPLOY_M08_BACKEND.ps1
+Página:
 
-### Correção M08 V2
+`/alertas`
 
-A V1 passou build e falhou no lint React 19 com `react-hooks/set-state-in-effect`.
+A antiga fonte mock foi substituída por `system_alerts`.
 
-V2:
+Categorias:
 
-- bootstraps assíncronos canceláveis;
-- modais sem sincronização de estado por efeito;
-- nenhuma regra ESLint desabilitada;
-- build OK;
-- lint 0 errors;
-- warnings antigos das Edge Functions M06 permanecem não bloqueantes.
+- connectivity
+- identity
+- hardware
+- software
+- health
 
-## 15. Rotas atuais
+Severidades:
+
+- info
+- warning
+- critical
+
+Status:
+
+- open
+- acknowledged
+- resolved
+
+Operações:
+
+- reconhecer;
+- resolver;
+- justificativa;
+- auditoria `alert.status.update`.
+
+### 15.6 Frontend do agente
+
+Componente:
+
+`src/components/agents/AssetAgentPanel.tsx`
+
+Integrado à ficha do ativo.
+
+Exibe:
+
+- status Online/Sem comunicação;
+- hostname;
+- token prefix;
+- versão;
+- último heartbeat;
+- SO/build;
+- CPU;
+- RAM;
+- arquitetura;
+- fabricante/modelo;
+- serial;
+- armazenamento;
+- programas instalados;
+- divergências;
+- baseline;
+- criar/rotacionar/revogar agente.
+
+## 16. M09 V2 UX — instalação simplificada
+
+Status:
+
+CONCLUÍDO E VALIDADO.
+
+Problema resolvido:
+
+o primeiro fluxo exigia extração de ZIP e PowerShell administrativo na máquina-alvo.
+
+Fluxo oficial após V2:
+
+1. No Wisdom TI, abrir o ativo.
+2. Criar ou rotacionar token.
+3. Copiar token.
+4. Levar `WisdomTI-Agent-Setup.exe` para a máquina.
+5. Dar dois cliques.
+6. Autorizar UAC.
+7. Colar token no formulário.
+8. Clicar Instalar.
+9. Instalador executa toda configuração.
+10. Primeira coleta é enviada automaticamente.
+
+Não é necessário abrir PowerShell no fluxo normal.
+
+Projeto:
+
+`agent/WisdomTI.Agent.Setup`
+
+Tecnologia:
+
+- C#/.NET 10;
+- WinForms;
+- WinExe;
+- self-contained win-x64;
+- manifest `requireAdministrator`;
+- payload `WisdomTI.Agent.exe` embutido como resource.
+
+O instalador gráfico:
+
+- valida token;
+- extrai agente;
+- cria `%ProgramData%\WisdomTI\Agent`;
+- grava configuração;
+- aplica ACL para SYSTEM/Administradores;
+- cria tarefa Startup;
+- cria tarefa Heartbeat a cada 15 minutos;
+- executa primeira coleta;
+- mostra sucesso/erro em interface gráfica.
+
+Arquivo universal:
+
+`WisdomTI-Agent-Setup.exe`
+
+O mesmo executável pode ser usado em todos os computadores.
+
+O token NÃO fica embutido no instalador universal.
+
+PowerShell permanece apenas como fallback técnico.
+
+## 17. Arquivos principais M09
+
+Frontend:
+
+- src/types/agent.ts
+- src/data/agent-service.ts
+- src/components/agents/AssetAgentPanel.tsx
+- src/pages/AlertsPage.tsx
+- src/pages/AssetDetailPage.tsx
+
+Backend:
+
+- supabase/functions/agent-admin/index.ts
+- supabase/functions/agent-ingest/index.ts
+
+Banco:
+
+- supabase/migrations/20260826_150000_m09_agent_inventory_alerts.sql
+- supabase/sql-history/M09_SUPABASE.sql
+
+Agente:
+
+- agent/WisdomTI.Agent/WisdomTI.Agent.csproj
+- agent/WisdomTI.Agent/Program.cs
+
+Instalador gráfico:
+
+- agent/WisdomTI.Agent.Setup/WisdomTI.Agent.Setup.csproj
+- agent/WisdomTI.Agent.Setup/Program.cs
+- agent/WisdomTI.Agent.Setup/app.manifest
+
+Scripts:
+
+- agent/scripts/BUILD_AGENT_PACKAGE.ps1
+- agent/scripts/INSTALL_AGENT.ps1
+- agent/scripts/UNINSTALL_AGENT.ps1
+- scripts/DEPLOY_M09_BACKEND.ps1
+- scripts/VALIDAR_M09.ps1
+
+Documentação:
+
+- docs/M09_TESTS.md
+- docs/M09_V2_UX.md
+
+## 18. Rotas atuais
 
 - /login
 - /dashboard
@@ -596,124 +875,120 @@ V2:
 - /configuracoes
 - /sem-permissao
 
-## 16. Pendências reais
-
-Alertas:
-
-- rota/UI existe;
-- ainda usa mock;
-- será substituído no M09.
+## 19. Pendências reais depois do M09
 
 Dashboard:
 
 - estrutura existe;
 - partes ainda usam mock;
-- será conectado a dados reais após M09.
+- deve ser conectado a dados reais no M10.
 
-Agente Windows:
+Relatórios:
 
-- ainda não implementado;
-- próximo macrobloco.
+- faltam relatórios gerenciais consolidados;
+- patrimônio;
+- estoque;
+- auditoria;
+- manutenção;
+- inventário automático;
+- alertas.
 
-Relatórios e consolidação:
+Produção:
 
-- pendentes após M09.
-
-Deploy final:
-
-- Cloudflare Pages, hardening, code splitting e PWA final depois dos módulos funcionais principais.
-
-## 17. Próximo marco — M09
-
-M09 — Agente Windows + inventário automático + heartbeat + divergências + alertas reais.
-
-Macroescopo:
-
-1. Backend:
-   - agentes/dispositivos;
-   - credencial própria e revogável;
-   - heartbeat;
-   - snapshots de inventário;
-   - hardware;
-   - software;
-   - saúde;
-   - divergências;
-   - alertas;
-   - histórico.
-
-2. Agente C#/.NET:
-   - instalação/configuração;
-   - identidade da máquina;
-   - coleta hardware/software;
-   - envio periódico;
-   - retry/offline;
-   - logs locais;
-   - HTTPS;
-   - nenhuma credencial administrativa.
-
-3. Comparação esperado x detectado:
-   - vínculo com ativo;
-   - CPU/RAM/discos/serial;
-   - componentes;
-   - software;
-   - divergências.
-
-4. Alertas reais:
-   - substituir mock;
-   - severidade;
-   - status;
-   - categoria;
-   - origem;
-   - ativo/agente;
-   - reconhecimento/resolução;
-   - auditoria.
-
-5. Integração:
-   - ficha do ativo recebe inventário automático;
-   - dashboard passa a usar indicadores reais onde aplicável.
-
-## 18. Decisões arquiteturais M09
-
-O agente NÃO deve:
-
-- usar service_role;
-- usar senha administrativa;
-- alterar patrimônio diretamente;
-- acessar Google Drive diretamente.
-
-O agente deve:
-
-- autenticar-se com identidade própria e revogável;
-- ter credencial individual;
-- permitir revogação;
-- usar HTTPS;
-- registrar last_seen_at;
-- usar protocolo versionado;
-- ter escopo mínimo.
-
-O backend decide:
-
-- vínculo agente ↔ ativo;
-- divergências;
-- criação/atualização de alertas;
-- reconhecimento/resolução.
-
-## 19. Depois do M09
-
-M10 — Consolidação operacional e produção:
-
-- dashboard real;
-- relatórios;
-- indicadores;
+- Cloudflare Pages;
+- PWA final;
+- domínio/HTTPS;
 - code splitting;
 - hardening;
-- PWA final;
-- Cloudflare Pages;
-- domínio/HTTPS;
-- processo de backup;
-- preparação white-label.
+- assinatura digital do instalador/agente;
+- estratégia de atualização automática do agente;
+- retenção/compactação de snapshots;
+- monitoramento operacional;
+- processo formal de backup/restore.
 
-## 20. Retomada
+## 20. Avisos técnicos
+
+Vite:
+
+- pode emitir warning de chunks maiores que 500 kB;
+- não é bloqueante;
+- code splitting será tratado no M10.
+
+ESLint:
+
+- existem warnings preexistentes em Edge Functions antigas;
+- 0 errors;
+- limpeza fica para hardening.
+
+Agente:
+
+- executável ainda não possui assinatura digital;
+- Windows SmartScreen pode alertar em máquinas novas;
+- assinatura de código deve ser feita antes da distribuição ampla em produção.
+
+Agente atual:
+
+- build win-x64;
+- considerar ARM64 apenas se houver demanda real.
+
+## 21. Próximo marco — M10
+
+M10 — Consolidação operacional e produção.
+
+Macroescopo recomendado:
+
+1. Dashboard real:
+   - ativos;
+   - estoque;
+   - auditorias;
+   - manutenção;
+   - alertas;
+   - agentes online/offline;
+   - divergências;
+   - indicadores operacionais.
+
+2. Relatórios:
+   - patrimônio;
+   - inventário;
+   - componentes;
+   - movimentações;
+   - auditorias;
+   - manutenções;
+   - alertas;
+   - agente/inventário automático;
+   - exportações adequadas.
+
+3. Hardening:
+   - code splitting;
+   - tratamento de warnings;
+   - estados de erro/loading;
+   - revisão de RLS/RBAC;
+   - limites;
+   - rate limiting onde necessário;
+   - retenção de snapshots;
+   - logs.
+
+4. Produção:
+   - Cloudflare Pages;
+   - PWA;
+   - HTTPS/domínio;
+   - configuração de ambiente;
+   - processo de deploy;
+   - smoke tests.
+
+5. Agente para produção:
+   - assinatura digital;
+   - versão;
+   - mecanismo de atualização;
+   - distribuição;
+   - documentação operacional.
+
+6. Continuidade:
+   - atualizar integralmente este MASTER_CONTEXT;
+   - commit/push final da etapa;
+   - preparar documentação de operação.
+
+## 22. Retomada
 
 Ao abrir novo chat, ler primeiro:
 
@@ -721,8 +996,12 @@ Ao abrir novo chat, ler primeiro:
 
 Considerar:
 
-- M01–M08 concluídos;
+- M01–M09 concluídos;
 - Supabase oficial: `dqfbzsneaamihfphjfcj`;
-- M08 banco, Edge Function e frontend validados;
-- próximo trabalho: M09;
+- M09 possui agente Windows real e validado;
+- instalação oficial é gráfica por `WisdomTI-Agent-Setup.exe`;
+- PowerShell não faz parte do fluxo normal de instalação do agente;
+- armazenamento e softwares são exibidos na ficha;
+- alertas são reais, não mock;
+- próximo trabalho: M10;
 - não reconstruir etapas anteriores sem regressão concreta.

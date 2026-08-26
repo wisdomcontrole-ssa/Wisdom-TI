@@ -18,6 +18,7 @@ import {
   useParams,
 } from 'react-router'
 import { useAuth } from '../auth/useAuth'
+import { AssetAgentPanel } from '../components/agents/AssetAgentPanel'
 import { InstalledComponentsCard } from '../components/assets/InstalledComponentsCard'
 import { AssetQrLabelCard } from '../components/assets/AssetQrLabelCard'
 import { EvidencePanel } from '../components/evidence/EvidencePanel'
@@ -440,6 +441,8 @@ export function AssetDetailPage() {
         asset={asset}
         onChanged={() => void refresh()}
       />
+
+      <AssetAgentPanel asset={asset} />
 
       <InstalledComponentsCard assetId={asset.id} />
 
