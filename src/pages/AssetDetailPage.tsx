@@ -21,6 +21,7 @@ import { useAuth } from '../auth/useAuth'
 import { InstalledComponentsCard } from '../components/assets/InstalledComponentsCard'
 import { AssetQrLabelCard } from '../components/assets/AssetQrLabelCard'
 import { EvidencePanel } from '../components/evidence/EvidencePanel'
+import { AssetLifecyclePanel } from '../components/maintenance/AssetLifecyclePanel'
 import { FormModal } from '../components/ui/FormModal'
 import {
   getAssetById,
@@ -321,7 +322,9 @@ export function AssetDetailPage() {
             </button>
           )}
 
-          {hasPermission('assets.move') && (
+          {hasPermission('assets.move') &&
+            asset.status !== 'retired' &&
+            asset.status !== 'disposed' && (
             <button
               type="button"
               onClick={() => setMoveOpen(true)}
@@ -431,6 +434,11 @@ export function AssetDetailPage() {
         ]}
         title="Fotos e evidências"
         description="Cadastro, movimentação, manutenção e descarte vinculados ao patrimônio."
+      />
+
+      <AssetLifecyclePanel
+        asset={asset}
+        onChanged={() => void refresh()}
       />
 
       <InstalledComponentsCard assetId={asset.id} />
@@ -563,8 +571,6 @@ function EditAssetModal({
   const [osName, setOsName] = useState(
     asset.os_name ?? '',
   )
-  const [status, setStatus] =
-    useState<AssetStatus>(asset.status)
   const [acquiredAt, setAcquiredAt] = useState(
     asset.acquired_at ?? '',
   )
@@ -584,7 +590,6 @@ function EditAssetModal({
       setSerial(asset.serial_number ?? '')
       setHostname(asset.hostname ?? '')
       setOsName(asset.os_name ?? '')
-      setStatus(asset.status)
       setAcquiredAt(asset.acquired_at ?? '')
       setNotes(asset.notes ?? '')
       setErrorMessage(null)
@@ -607,7 +612,7 @@ function EditAssetModal({
         serial_number: serial,
         hostname,
         os_name: osName,
-        status,
+        status: asset.status,
         acquired_at: acquiredAt,
         notes,
       })
@@ -680,30 +685,6 @@ function EditAssetModal({
                   {type.name}
                 </option>
               ))}
-            </select>
-          </Field>
-
-          <Field label="Estado">
-            <select
-              className={inputClass}
-              value={status}
-              onChange={(event) =>
-                setStatus(
-                  event.target
-                    .value as AssetStatus,
-                )
-              }
-            >
-              {Object.entries(statusLabels).map(
-                ([value, label]) => (
-                  <option
-                    key={value}
-                    value={value}
-                  >
-                    {label}
-                  </option>
-                ),
-              )}
             </select>
           </Field>
 

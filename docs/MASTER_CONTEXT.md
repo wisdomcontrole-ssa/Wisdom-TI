@@ -4,31 +4,67 @@
 
 Projeto: Wisdom TI
 
-Marco atual concluído:
+Marco atual concluído e validado:
 
-M06 — Fotos, Evidências e Google Drive.
+M07 — Manutenção, ciclo de vida e descarte.
 
-Marcos concluídos e validados:
+Marcos concluídos e preservados:
 
 - M01 — Fundação visual e estrutural;
 - M02 — Supabase, autenticação, RBAC e RLS;
 - correção global de encoding / PowerShell 5.1;
-- M03 — Unidades, ambientes e patrimônio real;
+- M03 — Unidades, ambientes e patrimônio;
 - M04 — Estoque e componentes;
 - M05 — Auditorias físicas e QR Code;
-- M06 — Fotos, evidências e Google Drive.
+- M06 — Fotos, evidências e Google Drive;
+- M07 — Manutenção, ciclo de vida e descarte.
 
-Status:
+Validação M07:
 
-M06 FRONTEND OK.
+- banco aplicado e validado anteriormente;
+- M07 Frontend V3 instalado;
+- arquivos e integrações V3 confirmados;
+- npm run build: OK;
+- npm run lint: OK;
+- validação funcional concluída no fluxo do projeto;
+- nenhum bug bloqueante de M07 foi reportado no fechamento.
+
+Não reconstruir M01-M07 sem evidência concreta de regressão.
 
 Próximo marco:
 
-M07 — Manutenção, ciclo de vida e descarte.
+M08 — Administração real: usuários, perfis/permissões, logs e configurações.
 
-Não iniciar M07 antes de confirmar que este MASTER_CONTEXT foi atualizado com sucesso.
+## 2. Ambiente e repositório
 
-## 2. Stack definida
+Projeto local:
+
+C:\Projetos\TI Wisdom\wisdom-ti
+
+Backups externos:
+
+C:\Projetos\TI Wisdom\_backups\wisdom-ti
+
+Downloads:
+
+$env:USERPROFILE\Downloads
+
+GitHub:
+
+https://github.com/wisdomcontrole-ssa/Wisdom-TI.git
+
+Branch principal:
+
+main
+
+Regra de versionamento:
+
+- GitHub é a fonte de versionamento entre computadores;
+- antes de novas etapas, verificar git status e sincronização;
+- ao concluir etapa aprovada: build, lint, testes, git add, commit e push;
+- nunca usar force push no fluxo normal.
+
+## 3. Stack definida
 
 Frontend/PWA:
 
@@ -49,7 +85,7 @@ Backend:
 - RLS;
 - RBAC;
 - RPCs PostgreSQL para operações críticas;
-- Supabase Edge Functions para operações seguras de evidência.
+- Supabase Edge Functions.
 
 Fotos/evidências:
 
@@ -58,59 +94,45 @@ Fotos/evidências:
 - DriveApp;
 - Supabase Edge Functions como ponte segura.
 
-Não usar na arquitetura M06:
-
-- Google Cloud Service Account;
-- Google Drive API direta no frontend;
-- credenciais administrativas Google no navegador;
-- GOOGLE_SERVICE_ACCOUNT_JSON_B64.
-
 Hospedagem planejada:
 
 - Cloudflare Pages.
 
-Agente futuro:
+Agente Windows planejado:
 
 - C#/.NET;
-- Windows;
 - inventário automático;
 - heartbeat;
 - comparação esperado x detectado;
-- alertas.
+- alertas de hardware, software e saúde.
 
 Ambiente local:
 
 - VS Code;
-- PowerShell;
-- Windows.
+- PowerShell 5.1 / Windows;
+- Git / GitHub;
+- Node/npm.
 
-Controle de versão:
+## 4. Regras permanentes de construção
 
-- Git;
-- GitHub.
+- trabalhar em etapas grandes e funcionais;
+- usar PowerShell pronto para copiar/executar;
+- scripts e instaladores devem ser executados diretamente de Downloads;
+- PowerShell deve criar/substituir estruturas automaticamente;
+- não pedir edição manual de trechos;
+- quando um arquivo mudar, entregar o arquivo completo;
+- quando vários arquivos mudarem, preferir instalador único;
+- executar build/lint/testes ao final de cada etapa;
+- não avançar de grande etapa sem validação;
+- antes de gerar código dependente da estrutura atual, ler este MASTER_CONTEXT;
+- manter compatibilidade Windows/PowerShell;
+- operações de campo devem ser mobile-first;
+- administração, estoque, relatórios e cadastros extensos devem aproveitar desktop;
+- manter histórico não destrutivo;
+- operações críticas devem registrar usuário, data/hora, ação, valores e justificativa quando aplicável;
+- permissões devem ser garantidas no backend, não somente na interface.
 
-## 3. Diretórios importantes
-
-Projeto:
-
-C:\Projetos\TI Wisdom\wisdom-ti
-
-Backups externos:
-
-C:\Projetos\TI Wisdom\_backups\wisdom-ti
-
-Downloads:
-
-$env:USERPROFILE\Downloads
-
-Regra operacional:
-
-- scripts, pacotes e instaladores entregues devem ser executados diretamente de Downloads;
-- não pedir ao usuário para mover arquivos para o projeto;
-- scripts devem usar caminhos absolutos para alterar o projeto;
-- localizar automaticamente o arquivo mais recente quando o navegador adicionar sufixos como (1), (2), etc.
-
-## 4. Encoding / PowerShell
+## 5. Encoding / PowerShell
 
 Aplicação:
 
@@ -118,24 +140,23 @@ Aplicação:
 
 PowerShell 5.1:
 
-- .ps1 com caracteres não ASCII deve usar UTF-8 com BOM;
-- preferir lógica ASCII nos instaladores quando possível;
-- não entregar scripts acentuados em UTF-8 sem BOM.
+- PS1 com caracteres não ASCII deve usar UTF-8 com BOM;
+- preferir ASCII em instaladores quando possível;
+- não entregar PS1 acentuado em UTF-8 sem BOM.
 
 Histórico:
 
-- houve mojibake causado por PowerShell 5.1 interpretando UTF-8 sem BOM;
-- a aplicação foi corrigida;
-- esta regra é permanente.
+- houve mojibake causado por PowerShell 5.1;
+- a correção de encoding é permanente.
 
-## 5. Variáveis de ambiente e secrets
+## 6. Segurança e variáveis de ambiente
 
 Frontend:
 
 - VITE_SUPABASE_URL
 - VITE_SUPABASE_PUBLISHABLE_KEY
 
-Supabase Edge Functions / Secrets M06:
+Supabase Edge Functions M06:
 
 - GOOGLE_APPS_SCRIPT_URL
 - GOOGLE_APPS_SCRIPT_SHARED_SECRET
@@ -145,30 +166,24 @@ Google Apps Script / Script Properties:
 - WISDOM_SHARED_SECRET
 - WISDOM_ROOT_FOLDER_ID
 
-Nunca colocar no frontend ou agente:
+Regras:
 
-- secret key;
-- service_role;
-- senha do PostgreSQL;
-- tokens administrativos;
-- credenciais administrativas Google;
-- segredo compartilhado do Apps Script.
+- nunca registrar valores reais de secrets;
+- .env.local contém valores locais reais e não deve ser exposto;
+- nunca colocar service_role, secret key, senha PostgreSQL, tokens administrativos ou credenciais Google administrativas no frontend ou agente;
+- credenciais administrativas devem permanecer exclusivamente em backend/infraestrutura segura;
+- o segredo Apps Script nunca é enviado ao navegador.
 
-.env.local contém valores locais reais e não deve ser exposto.
+## 7. Autenticação, RBAC e RLS
 
-Nenhum valor real de secret deve ser registrado neste documento.
+Supabase Auth:
 
-## 6. Segurança e autorização
-
-Autenticação:
-
-- Supabase Auth;
 - login email/senha;
 - sessão persistente;
 - logout;
 - rotas protegidas.
 
-RBAC:
+Tabelas:
 
 - roles;
 - permissions;
@@ -208,23 +223,20 @@ Permissões principais:
 - settings.manage
 - logs.view
 
-Regras:
-
-- RLS nas tabelas operacionais;
-- permissões críticas validadas no banco;
-- frontend não é a barreira final de segurança;
-- RPCs críticas validam permissão e justificativa;
-- Edge Functions M06 validam usuário e permissões;
-- segredo do Apps Script nunca é enviado ao navegador;
-- arquivo protegido é servido ao usuário via Edge Function autenticada;
-- revogação de evidência é lógica e preserva histórico.
-
 Funções-base:
 
 - public.has_permission(text)
 - public.get_my_access_context()
 
-## 7. Banco até M06
+Estado atual de administração:
+
+- backend RBAC/RLS existe;
+- UsersPage consulta profiles/roles;
+- gestão administrativa completa de usuários ainda será concluída no M08;
+- audit_logs existe no backend, mas ainda não há módulo administrativo completo de logs;
+- SettingsPage atual ainda é estrutural/estática.
+
+## 8. Banco consolidado até M07
 
 M02:
 
@@ -273,16 +285,35 @@ M06:
 - evidence_categories
 - evidence_files
 
-Funções de backend M06:
+M06 Edge Functions:
 
 - drive-health
 - evidence-upload
 - evidence-file
 - evidence-revoke
 
-## 8. Patrimônio
+M07:
 
-Código:
+- maintenance_orders
+- maintenance_parts
+- maintenance_events
+- asset_lifecycle_events
+- asset_disposals
+
+M07 RPCs:
+
+- create_maintenance_order()
+- update_maintenance_order()
+- add_maintenance_part()
+- remove_maintenance_part()
+- complete_maintenance_order()
+- cancel_maintenance_order()
+- retire_asset()
+- dispose_asset()
+
+## 9. Patrimônio
+
+Código patrimonial:
 
 WIS-{TIPO}-{000000}
 
@@ -292,24 +323,6 @@ Exemplos:
 - WIS-MON-000002
 - WIS-NB-000003
 
-Código gerado no PostgreSQL.
-
-Campos principais:
-
-- tipo;
-- fabricante;
-- modelo;
-- serial;
-- hostname;
-- sistema operacional;
-- status;
-- unidade atual;
-- ambiente atual;
-- aquisição;
-- observações;
-- autoria;
-- timestamps.
-
 Status:
 
 - active;
@@ -318,28 +331,36 @@ Status:
 - retired;
 - disposed.
 
+Funcionalidades:
+
+- cadastro;
+- busca e filtros;
+- edição;
+- ficha;
+- movimentação;
+- histórico;
+- QR Code;
+- componentes instalados;
+- evidências;
+- manutenção;
+- ciclo de vida;
+- baixa;
+- descarte.
+
 Movimentação:
 
 - histórico não destrutivo;
-- origem;
-- destino;
+- origem/destino;
 - usuário;
 - data/hora;
 - justificativa;
 - RPC move_asset().
 
-M06 adicionou à ficha do ativo:
+Rota patrimonial estável:
 
-- seção Fotos e evidências;
-- upload por câmera;
-- galeria;
-- arquivo;
-- preview protegido;
-- abertura no Google Drive;
-- revogação lógica;
-- categorias por contexto.
+/ativo/{asset_code}
 
-## 9. Localizações
+## 10. Localizações
 
 Tabelas:
 
@@ -348,26 +369,27 @@ Tabelas:
 
 Regras:
 
-- inativação em vez de delete operacional;
 - ambiente pertence a uma unidade;
-- backend valida a relação;
-- operações críticas são auditadas.
+- inativação em vez de exclusão operacional;
+- backend valida relação;
+- operações críticas auditadas.
 
-## 10. Estoque e componentes
+Frontend:
 
-Peça física:
+- página de ambientes/unidades integrada ao Supabase.
 
-stock_units
+## 11. Estoque e componentes
 
-Código:
+Tabelas:
+
+- stock_products;
+- stock_units;
+- asset_components;
+- stock_movements.
+
+Código físico:
 
 WIS-CMP-{TIPO}-{000000}
-
-Exemplos:
-
-- WIS-CMP-RAM-000001
-- WIS-CMP-SSD-000002
-- WIS-CMP-HDD-000003
 
 Condição:
 
@@ -384,63 +406,21 @@ Status:
 - maintenance
 - disposed
 
-Histórico:
-
-stock_movements
-
-Componente ↔ máquina:
-
-asset_components
-
 Regras:
 
 - uma instalação ativa por peça;
 - histórico anterior preservado;
-- retirada encerra a instalação;
-- peça retorna ao estoque com condição informada;
-- origem/destino preservados.
+- retirada encerra instalação;
+- origem/destino preservados;
+- vínculo componente ↔ máquina;
+- ativos retired/disposed não recebem novos componentes;
+- descarte de ativo é bloqueado enquanto houver componentes instalados.
 
-M06 adicionou à ficha de estoque:
+M06 adicionou evidências de estoque.
 
-- Fotos e evidências;
-- categorias Estoque, Manutenção e Outros;
-- preview protegido;
-- Google Drive;
-- revogação não destrutiva.
+M07 reutiliza estoque/asset_components para peças e manutenção.
 
-## 11. QR patrimonial
-
-Destino estável:
-
-/ativo/{asset_code}
-
-Exemplo:
-
-/ativo/WIS-DT-000001
-
-Ficha do ativo:
-
-- QR visual;
-- código;
-- descrição;
-- URL;
-- impressão de etiqueta.
-
-Biblioteca:
-
-- react-qr-code 2.2.0.
-
-Etiqueta atual:
-
-- aproximadamente 60 mm x 35 mm;
-- QR;
-- Wisdom TI;
-- código;
-- tipo;
-- fabricante/modelo;
-- serial quando existente.
-
-## 12. Auditorias físicas M05/M06
+## 12. Auditorias físicas e QR Code
 
 Tabelas:
 
@@ -457,22 +437,14 @@ Escopo:
 - unidade inteira;
 - ambiente específico.
 
-Ao criar:
-
-- banco gera snapshot dos ativos esperados;
-- snapshot permanece como referência do ciclo.
-
-Resultados de audit_items:
+Resultados:
 
 - pending
 - found
 - missing
 - divergent
 - extra
-
-Resultado adicional de scan:
-
-- unknown_code
+- unknown_code para scan
 
 Métodos:
 
@@ -480,123 +452,46 @@ Métodos:
 - manual
 - file
 
-Leitura aceita:
+Scanner:
 
-- URL completa;
-- código patrimonial;
-- câmera;
-- imagem;
-- entrada manual.
+- html5-qrcode 2.3.8;
+- câmera com preferência environment;
+- leitura de imagem;
+- entrada manual;
+- URL /ativo/{asset_code} ou código patrimonial.
 
-Classificação:
+Fechamento:
 
-found:
-- ativo pertence ao snapshot;
-- local observado coincide com o esperado.
-
-divergent:
-- ativo pertence ao snapshot;
-- observado em local diferente.
-
-extra:
-- ativo existe no Wisdom TI;
-- não fazia parte do snapshot.
-
-unknown_code:
-- código não corresponde a ativo cadastrado.
-
-missing:
-- ativo esperado permaneceu pending até o fechamento.
-
-Cada leitura gera audit_scan_events, inclusive leituras repetidas.
+- pending esperado vira missing;
+- ciclo fica closed;
+- histórico preservado.
 
 M06 adicionou:
 
-- evidências gerais da auditoria;
-- evidências vinculadas a audit_item;
-- captura por câmera/galeria/arquivo;
+- evidência geral de auditoria;
+- evidência por audit_item;
+- câmera/galeria/arquivo;
 - preview protegido;
-- histórico preservado;
-- auditoria fechada/cancelada em modo somente consulta para novas evidências.
+- Drive;
+- histórico preservado.
 
-## 13. Execução mobile
-
-Rota:
-
-/auditorias/:auditId
-
-Interface:
-
-- progresso;
-- contadores;
-- local observado;
-- câmera;
-- leitura de imagem;
-- entrada manual;
-- resultado da última leitura;
-- filtros;
-- lista esperada;
-- observações;
-- leituras recentes;
-- fechamento;
-- cancelamento;
-- consulta após fechamento;
-- evidências gerais da auditoria;
-- evidências por item.
-
-Scanner:
-
-- html5-qrcode 2.3.8.
-
-Câmera:
-
-- preferência por facingMode environment;
-- depende de contexto seguro;
-- localhost serve para desenvolvimento;
-- produção futura usará HTTPS no Cloudflare Pages.
-
-M06:
-
-- captura de evidência mobile-first;
-- imagens JPEG/PNG/WEBP são otimizadas no navegador antes do upload;
-- HEIC/HEIF e PDF são aceitos dentro do limite suportado;
-- limite operacional final da ponte: 5 MB por arquivo.
-
-## 14. Fechamento da auditoria
-
-RPC:
-
-public.close_physical_audit()
-
-Ao fechar:
-
-- expected=true e pending vira missing;
-- status vira closed;
-- closed_at;
-- closed_by;
-- contagens finais preservadas;
-- eventos preservados;
-- interface somente consulta.
-
-Cancelamento:
-
-public.cancel_physical_audit()
-
-Requer:
-
-- audits.close;
-- justificativa.
-
-## 15. Fotos e evidências M06
+## 13. Fotos e evidências M06
 
 Arquitetura oficial:
 
 React
-→ Supabase Auth / RBAC
+→ Supabase Auth/RBAC
 → Supabase Edge Function
 → Google Apps Script Web App
 → DriveApp
 → Google Drive
+
+Decisão permanente:
+
+- não usar Google Cloud Service Account;
+- não usar Google Drive API direta no frontend;
+- não usar GOOGLE_SERVICE_ACCOUNT_JSON_B64;
+- não tornar arquivos privados públicos para simplificar preview.
 
 Google Drive raiz:
 
@@ -610,30 +505,17 @@ Wisdom TI
 ├── Estoque
 └── Documentos Gerais
 
-Pastas de ativo criadas sob demanda:
+Pastas de ativo:
 
-Ativos
-└── {asset_code}
-    ├── Cadastro
-    ├── Auditoria
-    ├── Movimentacao
-    ├── Manutencao
-    ├── Descarte
-    └── Outros
+Ativos/{asset_code}/
+├── Cadastro
+├── Auditoria
+├── Movimentacao
+├── Manutencao
+├── Descarte
+└── Outros
 
-Pastas de auditoria:
-
-Auditorias
-└── {audit_code}
-    └── categoria da evidência
-
-Pastas de estoque:
-
-Estoque
-└── {stock_code}
-    └── categoria da evidência
-
-Categorias suportadas pelo backend:
+Categorias:
 
 - registration
 - audit
@@ -642,35 +524,6 @@ Categorias suportadas pelo backend:
 - disposal
 - stock
 - other
-
-Metadados preservados no PostgreSQL incluem:
-
-- categoria;
-- ativo;
-- auditoria;
-- item de auditoria;
-- item de estoque;
-- nome original;
-- nome armazenado;
-- MIME type;
-- tamanho;
-- SHA-256;
-- ID do arquivo no Drive;
-- ID da pasta no Drive;
-- método de captura;
-- legenda;
-- data de captura;
-- usuário;
-- status;
-- timestamps;
-- metadados auxiliares.
-
-Métodos de captura:
-
-- camera
-- gallery
-- file
-- system
 
 Tipos suportados:
 
@@ -681,117 +534,109 @@ Tipos suportados:
 - image/heif
 - application/pdf
 
-Limite da ponte Apps Script:
+Limite operacional atual:
 
 5 MB por arquivo.
 
 Frontend:
 
-- compacta JPEG/PNG/WEBP antes do envio quando necessário;
-- oferece câmera;
-- oferece galeria;
-- oferece seleção de arquivo;
-- faz preview de imagens/PDF suportados;
-- permite abrir no Google Drive;
-- permite revogação com justificativa.
+- câmera;
+- galeria;
+- seleção de arquivo;
+- compressão JPEG/PNG/WEBP;
+- preview autenticado;
+- abrir no Drive;
+- revogação lógica com justificativa.
 
 Revogação:
 
 - não destrutiva;
-- status muda para revoked;
-- revoked_at;
-- revoked_by;
-- revoke_reason;
-- registro continua consultável;
-- arquivo físico não é automaticamente destruído pela operação de revogação.
+- arquivo/metadado preservado para histórico;
+- status/revoked_at/revoked_by/reason registrados.
 
-## 16. Google Apps Script M06
+## 14. M07 — Manutenção, ciclo de vida e descarte
 
-Projeto:
+Status:
 
-Wisdom TI - Drive Bridge
+CONCLUÍDO E VALIDADO.
 
-Arquivo principal:
+Banco:
 
-Code.gs
+- maintenance_orders;
+- maintenance_parts;
+- maintenance_events;
+- asset_lifecycle_events;
+- asset_disposals.
 
-Função de verificação:
+Códigos:
 
-setupCheck()
+- manutenção: MAN-{ANO}-{000000};
+- descarte: DSC-{ANO}-{000000}.
 
-Ações do Web App:
+Regras principais:
 
-- health
-- upload
-- download
-- trash
+- uma manutenção ativa por ativo;
+- abrir manutenção muda o ativo para maintenance;
+- atualização preserva histórico;
+- conclusão define status final do ativo;
+- cancelamento restaura o ciclo;
+- baixa exige assets.retire;
+- descarte exige ativo previamente retired;
+- descarte é bloqueado se houver componentes instalados;
+- ativo retired/disposed não recebe novos componentes;
+- histórico de ciclo de vida é não destrutivo.
 
-Script Properties:
+Frontend M07 V3:
 
-- WISDOM_SHARED_SECRET
-- WISDOM_ROOT_FOLDER_ID
+- rota /manutencoes;
+- rota /manutencoes/:maintenanceId;
+- MaintenancePage;
+- MaintenanceDetailPage;
+- MaintenanceCreateModal;
+- AssetLifecyclePanel;
+- maintenance-service;
+- tipos de manutenção;
+- integração na ficha do ativo;
+- histórico/ciclo de vida;
+- peças e materiais;
+- reutilização do EvidencePanel do M06;
+- baixa;
+- descarte.
 
-Publicação:
+Arquivos principais:
 
-- Web App;
-- executar como a conta proprietária/autorizada;
-- URL publicada termina em /exec.
+- src/types/maintenance.ts
+- src/data/maintenance-service.ts
+- src/components/maintenance/MaintenanceCreateModal.tsx
+- src/components/maintenance/AssetLifecyclePanel.tsx
+- src/pages/MaintenancePage.tsx
+- src/pages/MaintenanceDetailPage.tsx
+- src/components/evidence/EvidencePanel.tsx
+- src/pages/AssetDetailPage.tsx
+- src/pages/AssetsPage.tsx
+- src/components/layout/navigation.ts
+- src/App.tsx
 
-A ponte valida:
+Banco/documentação M07:
 
-- segredo compartilhado;
-- pasta raiz;
-- MIME type;
-- tamanho;
-- rota lógica;
-- arquivo pertencente à árvore Wisdom TI nas operações protegidas.
+- supabase/migrations/20260825_093600_m07_maintenance_lifecycle.sql
+- supabase/sql-history/M07_SUPABASE.sql
+- supabase/sql-history/M07_VALIDAR.sql
+- docs/M07_FRONTEND_TESTS.md
+- docs/M07_FRONTEND_V2_FIX.md
+- docs/M07_FRONTEND_V3_FIX.md
+- scripts/VALIDAR_M07_FRONTEND.ps1
 
-Decisão permanente do M06:
+Validação técnica final:
 
-- não usar Google Cloud Service Account;
-- não usar GOOGLE_SERVICE_ACCOUNT_JSON_B64;
-- não expor credenciais Google no React;
-- integração automática ocorre via Google Apps Script + DriveApp.
+- arquivos M07 V3 presentes: OK;
+- navegação e integrações: OK;
+- build: OK;
+- lint: OK;
+- validação funcional: concluída;
+- SQL M07 não deve ser reexecutado sem evidência de problema.
 
-## 17. Supabase Edge Functions M06
-
-drive-health:
-
-- exige usuário autenticado;
-- exige settings.manage;
-- valida a ponte Apps Script;
-- retorna pasta raiz e pastas base.
-
-evidence-upload:
-
-- exige usuário autenticado;
-- valida RBAC pelo contexto;
-- valida categoria;
-- valida MIME type;
-- valida tamanho;
-- resolve ativo/auditoria/item/estoque;
-- gera nome padronizado;
-- calcula SHA-256;
-- envia arquivo para Apps Script;
-- registra metadados no PostgreSQL;
-- em falha do insert tenta enviar arquivo recém-criado para lixeira.
-
-evidence-file:
-
-- exige usuário autenticado;
-- valida permissão de visualização;
-- obtém arquivo via Apps Script;
-- devolve conteúdo protegido ao navegador.
-
-evidence-revoke:
-
-- exige usuário autenticado;
-- exige permissão correspondente ao contexto;
-- exige justificativa;
-- revoga logicamente a evidência;
-- preserva trilha.
-
-## 18. Rotas atuais
+## 15. Rotas atuais
 
 /login
 /dashboard
@@ -802,13 +647,52 @@ evidence-revoke:
 /estoque/:stockUnitId
 /auditorias
 /auditorias/:auditId
+/manutencoes
+/manutencoes/:maintenanceId
 /alertas
 /ambientes
 /usuarios
 /configuracoes
 /sem-permissao
 
-## 19. Testes concluídos
+## 16. Estado real das áreas ainda incompletas
+
+Alertas:
+
+- rota e UI existem;
+- AlertsPage ainda consome src/data/mock.ts;
+- não existe ainda backend real de alertas do agente.
+
+Dashboard:
+
+- estrutura visual existe desde M01;
+- partes operacionais ainda usam dados mock;
+- será conectado a dados reais após os módulos administrativos/agente necessários.
+
+Usuários:
+
+- Auth/RBAC/RLS existem desde M02;
+- UsersPage lista profiles com roles;
+- gestão administrativa completa ainda falta.
+
+Configurações:
+
+- página existe;
+- opções atuais são estruturais/estáticas;
+- configuração operacional real ainda falta.
+
+Logs:
+
+- audit_logs existe;
+- não existe ainda uma experiência administrativa completa para consulta/filtro.
+
+Agente Windows:
+
+- ainda não implementado;
+- será desenvolvido em C#/.NET;
+- deve inventariar hardware/software, enviar heartbeat e gerar divergências/alertas.
+
+## 17. Testes concluídos
 
 M01:
 
@@ -816,20 +700,12 @@ M01:
 
 M02:
 
-- build;
-- lint;
 - Supabase;
-- login;
-- sessão;
+- login/sessão/logout;
 - rotas protegidas;
 - RBAC;
 - RLS;
-- logout.
-
-Encoding:
-
-- textos corrigidos;
-- regra UTF-8/BOM aplicada.
+- build/lint.
 
 M03:
 
@@ -841,189 +717,149 @@ M03:
 - edição;
 - movimentação;
 - histórico;
-- rota /ativo/{codigo};
-- build;
-- lint.
+- build/lint.
 
 M04:
 
 - estoque;
 - entrada;
-- código automático;
-- ficha;
 - transferência;
 - instalação;
 - retirada;
-- condição;
-- status;
+- condição/status;
 - histórico;
 - componente ↔ máquina;
-- build;
-- lint.
+- build/lint.
 
 M05:
 
-- build aprovado;
-- lint aprovado;
-- QR visual;
-- impressão de etiqueta;
-- rota /ativo/{asset_code};
-- criação de auditoria;
+- QR;
+- etiqueta;
+- auditoria;
 - snapshot;
-- entrada manual;
-- leitura por imagem;
-- scanner de câmera;
-- found;
-- divergent;
-- extra;
-- unknown_code;
-- observações;
+- scanner;
+- found/divergent/extra/unknown/missing;
 - fechamento;
-- pending -> missing;
-- histórico preservado;
-- consulta pós-fechamento.
+- histórico;
+- build/lint.
 
-M06 backend:
+M06:
 
-- Google Apps Script configurado;
-- Script Properties configuradas;
-- Web App publicado;
-- Supabase CLI autenticado;
-- Supabase Secrets configurados;
-- Edge Functions publicadas;
-- drive-health validado;
-- Supabase -> Apps Script -> Google Drive validado.
+- Apps Script;
+- Supabase Edge Functions;
+- drive-health;
+- upload;
+- preview;
+- Drive;
+- revogação;
+- auditoria;
+- estoque;
+- câmera/galeria/arquivo;
+- compactação;
+- build/lint.
 
-M06 frontend:
+M07:
 
-- build OK;
-- lint OK;
-- upload de ativo OK;
-- preview de ativo OK;
-- arquivo no Google Drive OK;
-- revogação OK;
-- evidência de auditoria OK;
-- evidência por item de auditoria implementada;
-- evidência de estoque OK;
-- câmera/galeria/arquivo implementados;
-- compactação de imagem implementada;
-- preview protegido implementado;
-- histórico não destrutivo preservado.
+- banco: OK;
+- frontend V3: OK;
+- navegação/integrações: OK;
+- build: OK;
+- lint: OK;
+- fluxo funcional: validado;
+- status final: M07 OK.
 
-Status final:
+## 18. Avisos técnicos e pendências não bloqueantes
 
-M06 FRONTEND OK.
-
-## 20. Avisos técnicos
-
-Vite pode avisar:
+Vite:
 
 Some chunks are larger than 500 kB after minification.
 
-Situação:
+Tratamento:
 
 - warning não bloqueante;
-- build passa;
-- otimização/code splitting será tratada separadamente;
-- não misturar com módulos funcionais atuais.
+- não misturar code splitting com correções funcionais;
+- otimização será feita antes do deploy final.
 
 Apps Script:
 
-- sujeito às cotas normais do Google Apps Script;
-- manter limite de 5 MB por arquivo na ponte atual;
-- imagens devem continuar sendo comprimidas no frontend;
-- não transformar arquivos privados do Drive em públicos apenas para facilitar preview.
+- sujeito às cotas do Google Apps Script;
+- manter 5 MB por arquivo na ponte atual;
+- continuar compressão de imagens no frontend.
 
-Não há bug bloqueante conhecido no M06.
+PWA/deploy:
 
-## 21. Fluxo Supabase
+- Cloudflare Pages permanece planejado;
+- HTTPS será necessário para câmera em produção;
+- hardening, code splitting e configuração final de deploy ainda pendentes.
 
-Banco:
+White-label:
 
-- fornecer SQL completo;
-- colar no SQL Editor do Supabase;
-- não pedir edição manual de trechos;
-- scripts idempotentes quando possível;
-- nunca expor secrets.
+- será preparado antes do deploy final;
+- não tratar antes dos módulos funcionais restantes.
 
-PowerShell:
+## 19. Próximo marco — M08
 
-- baixar;
-- manter em Downloads;
-- executar de Downloads;
-- alterar projeto usando caminhos absolutos.
+M08 — Administração real: usuários, perfis/permissões, logs e configurações.
 
-Apps Script:
+Objetivo:
 
-- Code.gs sempre entregue completo quando houver mudança;
-- não pedir edição parcial de função;
-- Script Properties nunca devem ser expostas na conversa;
-- novas versões do Web App devem respeitar a URL/implantação vigente.
+- transformar a administração atual em módulo operacional real;
+- manter secrets administrativos fora do frontend;
+- concluir gestão de usuários sem expor service_role;
+- permitir alteração controlada de perfil/role e estado ativo;
+- registrar alterações críticas em audit_logs;
+- oferecer consulta/filtros de logs;
+- tornar Configurações funcional para parâmetros seguros;
+- preservar RBAC/RLS e trilha de auditoria.
 
-## 22. Backups
+Princípio de segurança:
 
-Backups fora do projeto:
+qualquer operação que exija Supabase Admin API/service_role deve ocorrer somente em Edge Function/backend seguro, nunca no React.
 
-C:\Projetos\TI Wisdom\_backups\wisdom-ti
+Depois do M08:
 
-Motivos:
+M09 — Agente Windows + inventário automático + heartbeat + alertas reais.
 
-- evitar lint de backup;
-- repositório limpo;
-- recuperação segura.
+Depois:
 
-M06 usou backups externos antes de substituir backend/frontend.
+- dashboard/indicadores totalmente reais;
+- relatórios e consolidação operacional;
+- hardening/PWA/deploy Cloudflare Pages;
+- preparação white-label/replicação.
 
-## 23. Próximo marco
+## 20. Próxima etapa de implementação
 
-M07 — Manutenção, ciclo de vida e descarte.
+Antes de gerar M08:
 
-Objetivo preliminar:
+1. confirmar repositório limpo após commit/push M07;
+2. ler este MASTER_CONTEXT;
+3. considerar M01-M07 concluídos;
+4. não alterar SQL M07;
+5. mapear exatamente os arquivos M08 que serão afetados;
+6. entregar banco/Edge Functions/frontend em etapa grande e coerente;
+7. finalizar com build/lint/testes e atualização deste documento.
 
-- ordens/registros de manutenção;
-- entrada e saída de manutenção;
-- defeito/sintoma;
-- diagnóstico;
-- ação executada;
-- peças utilizadas;
-- técnico responsável;
-- fornecedor externo quando aplicável;
-- custo;
-- datas;
-- status;
-- anexos/evidências já fornecidos pelo M06;
-- histórico não destrutivo;
-- descarte/baixa com justificativa;
-- evidências de descarte;
-- bloqueio de operações incompatíveis após descarte;
-- trilha de auditoria.
+## 21. Retomada em novo chat
 
-M06 já fornece a infraestrutura de fotos/evidências que M07 deve reutilizar.
-
-Não iniciar M07 antes de confirmação da atualização deste MASTER_CONTEXT.
-
-## 24. Retomada em novo chat
-
-1. Ler primeiro:
+Ler primeiro:
 
 C:\Projetos\TI Wisdom\wisdom-ti\docs\MASTER_CONTEXT.md
 
-2. Considerar M01 até M06 concluídos e validados.
+Considerar:
 
-3. Não reconstruir etapas anteriores sem evidência de regressão.
+- M01-M07 concluídos;
+- M07 banco e frontend validados;
+- não reconstruir etapas anteriores sem regressão real;
+- próximo trabalho: M08 — Administração real.
 
-4. Próximo trabalho:
-
-M07 — Manutenção, ciclo de vida e descarte.
-
-5. Manter:
+Manter obrigatoriamente:
 
 - Windows;
 - PowerShell;
 - Downloads;
 - scripts completos;
 - arquivos completos;
-- Supabase SQL Editor;
+- Supabase SQL somente no SQL Editor;
 - Google Drive via Apps Script;
 - sem Google Cloud Service Account;
 - backups externos;
@@ -1031,5 +867,6 @@ M07 — Manutenção, ciclo de vida e descarte.
 - PS1 UTF-8 BOM;
 - RBAC/RLS;
 - histórico não destrutivo;
-- mobile-first em operações de campo;
+- mobile-first em campo;
+- segurança administrativa no backend;
 - nenhuma credencial administrativa no frontend.

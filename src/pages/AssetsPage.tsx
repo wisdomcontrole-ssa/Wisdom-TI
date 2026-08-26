@@ -756,13 +756,6 @@ function CreateAssetModal({
             >
               <option value="active">Ativo</option>
               <option value="stock">Estoque</option>
-              <option value="maintenance">
-                Manutenção
-              </option>
-              <option value="retired">Baixado</option>
-              <option value="disposed">
-                Descartado
-              </option>
             </select>
           </Field>
 

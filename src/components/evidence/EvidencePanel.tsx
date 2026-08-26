@@ -104,6 +104,7 @@ export function EvidencePanel({
   description = 'Arquivos rastreáveis armazenados no Google Drive.',
   defaultCategory = 'other',
   categoryOptions = allCategories,
+  visibleCategories,
   compact = false,
 }: {
   context: EvidenceContext
@@ -113,6 +114,7 @@ export function EvidencePanel({
   description?: string
   defaultCategory?: EvidenceCategoryCode
   categoryOptions?: EvidenceCategoryCode[]
+  visibleCategories?: EvidenceCategoryCode[]
   compact?: boolean
 }) {
   const {
@@ -208,12 +210,22 @@ export function EvidencePanel({
     }
   }
 
+  const visibleItems = useMemo(
+    () =>
+      visibleCategories?.length
+        ? items.filter((item) =>
+            visibleCategories.includes(item.category_code),
+          )
+        : items,
+    [items, visibleCategories],
+  )
+
   const activeCount = useMemo(
     () =>
-      items.filter(
+      visibleItems.filter(
         (item) => item.status === 'active',
       ).length,
-    [items],
+    [visibleItems],
   )
 
   const bodyPadding = compact
@@ -288,14 +300,14 @@ export function EvidencePanel({
           </div>
         )}
 
-        {loading && items.length === 0 ? (
+        {loading && visibleItems.length === 0 ? (
           <div className="grid min-h-32 place-items-center text-slate-400">
             <RefreshCw
               size={17}
               className="animate-spin"
             />
           </div>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
             <Images
               size={22}
@@ -316,7 +328,7 @@ export function EvidencePanel({
                 : 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3'
             }
           >
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <EvidenceCard
                 key={item.id}
                 evidence={item}
