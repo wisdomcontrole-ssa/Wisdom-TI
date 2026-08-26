@@ -933,9 +933,61 @@ Agente atual:
 
 ## 21. Próximo marco — M10
 
-M10 — Consolidação operacional e produção.
+M10 — Consolidação operacional, identidade institucional e produção.
 
-Macroescopo recomendado:
+### Identidade institucional / white-label
+
+Decisão de produto:
+
+- o nome genérico padrão do aplicativo passa a ser `Inventário TI`;
+- nomes anteriores de produto não devem permanecer como marca principal da interface;
+- a instituição usuária poderá personalizar sua identidade em Administração → Configurações.
+
+Configurações de identidade:
+
+- nome de exibição da instituição;
+- logomarca PNG;
+- e-mail de suporte e demais dados institucionais já configuráveis;
+- demais informações institucionais que forem necessárias ao produto.
+
+Logo:
+
+- upload PNG pelo administrador;
+- permissão `settings.manage`;
+- validação de tipo e tamanho;
+- armazenamento controlado no backend;
+- nenhuma credencial administrativa no frontend;
+- a logo institucional é considerada informação pública de apresentação e poderá ser carregada inclusive antes do login;
+- prever fallback para a marca genérica `Inventário TI` quando não houver logo configurada.
+
+Uso da identidade:
+
+- login;
+- navegação/layout principal;
+- cabeçalhos adequados;
+- etiquetas patrimoniais/QR Code;
+- impressão/exportação de etiquetas;
+- telas/documentos institucionais relevantes.
+
+Etiquetas:
+
+- devem exibir, quando configurados:
+  - logomarca;
+  - nome da instituição;
+  - código patrimonial;
+  - QR Code;
+  - identificação essencial do ativo;
+- preservar legibilidade em impressoras térmicas e impressão A4;
+- prever versão sem logo quando a configuração estiver ausente.
+
+Arquitetura recomendada:
+
+- não usar Google Drive autenticado para a logo principal, porque ela precisa aparecer também antes do login;
+- criar backend específico de branding público, com escrita protegida por `settings.manage`;
+- limitar logo a PNG otimizado e tamanho pequeno;
+- manter nome genérico `Inventário TI` como fallback técnico e visual.
+
+### Demais macroescopos M10
 
 1. Dashboard real:
    - ativos;
