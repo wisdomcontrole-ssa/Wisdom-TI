@@ -17,6 +17,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBranding } from '../../branding/BrandContext'
 import { cn } from '../../lib/cn'
 import { WisdomMark } from '../brand/WisdomMark'
+import { ConnectivityBanner } from '../system/ConnectivityBanner'
 import { mainNavigation } from './navigation'
 import { SidebarContent } from './SidebarContent'
 
@@ -188,6 +189,8 @@ export function AppShell() {
             </div>
           </div>
         </header>
+
+        <ConnectivityBanner />
 
         <main className="mx-auto w-full max-w-[1600px] px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8">
           <Outlet />

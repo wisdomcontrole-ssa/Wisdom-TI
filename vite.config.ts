@@ -35,9 +35,13 @@ export default defineConfig({
           },
         ],
       },
+      workbox: {
+        cleanupOutdatedCaches: true,
+      },
     }),
   ],
   build: {
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
