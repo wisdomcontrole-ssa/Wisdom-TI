@@ -1,132 +1,174 @@
-# Inventário TI — M11 — Produção
+# M11 — PRODUÇÃO / GO-LIVE — INSTÂNCIA 2
 
-## Estratégia Cloudflare
+## Status
 
-Usar Cloudflare Pages com Git Integration ao repositório GitHub:
+GO-LIVE WEB APROVADO.
 
-`wisdomcontrole-ssa/Wisdom-TI`
+Data de fechamento:
 
-Branch de produção:
+`2026-08-28`
+
+Produto:
+
+`Inventário TI`
+
+Produção:
+
+`https://inventario-ti-9z1.pages.dev`
+
+## GitHub
+
+Repositório:
+
+`https://github.com/juliocpsprof-afk/Inventario-TI.git`
+
+Branch:
 
 `main`
 
-A integração Git é a estratégia oficial deste projeto.
+Commit-base utilizado na normalização anterior ao go-live:
 
-Não criar um projeto Pages separado por Direct Upload antes da integração Git.
+`f535061b0b75aa49e07783f8f3eb9dd9f023f241`
 
-## Configuração Pages
+## Supabase
 
-Framework:
+Project Ref:
 
-`Vite`
+`yresuszqnakdxupewtsf`
 
-Build command:
+URL:
 
-`npm run build`
+`https://yresuszqnakdxupewtsf.supabase.co`
 
-Build output:
+Banco:
 
-`dist`
+- migrations M02–M10 aplicadas;
+- migrations M03/M04/M06 recuperadas;
+- M08/M09/M10 com versões normalizadas;
+- dry-run remoto aprovado.
 
-Root directory:
+## Cloudflare Pages
 
-raiz do repositório.
+Configuração:
 
-## Variáveis de produção
+- production branch: `main`
+- framework preset: `None`
+- build command: `npm run build`
+- output directory: `dist`
+- root directory: vazio
 
-Cadastrar em Production e Preview:
+Variáveis:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-Os valores devem corresponder ao projeto Supabase oficial:
+Não registrar valores de chave neste documento.
 
-`yresuszqnakdxupewtsf`
+## Supabase Auth
 
-Nunca cadastrar no frontend:
+Configuração concluída:
 
-- service_role;
-- secret key;
-- senha PostgreSQL;
-- GOOGLE_APPS_SCRIPT_SHARED_SECRET;
-- outros secrets backend.
+- Site URL: `https://inventario-ti-9z1.pages.dev`
+- Redirect URL de produção permitida
+- `auth.invite_redirect_url`: `https://inventario-ti-9z1.pages.dev`
 
-## SPA
+## Headers e PWA
 
-`public/_redirects`:
+Validações aprovadas:
 
-`/* /index.html 200`
+- `X-Frame-Options`
+- `X-Content-Type-Options`
+- `Referrer-Policy`
+- `Permissions-Policy`
+- `X-Robots-Tag`
+- `Content-Security-Policy`
+- CSP com Supabase da Instância 2
+- CSP sem Supabase original
+- `manifest.webmanifest`
+- `sw.js`
+- rotas SPA
+- refresh direto em rota interna
 
-## Headers
+## Smoke técnico
 
-`public/_headers` adiciona:
+Aprovado:
 
-- CSP;
-- clickjacking protection;
-- nosniff;
-- Referrer Policy;
-- Permissions Policy;
-- noindex;
-- cache imutável para assets com hash;
-- no-cache para manifest/service worker.
+- home HTTP 200;
+- `/login`;
+- `/dashboard`;
+- `/patrimonio`;
+- `/estoque`;
+- `/auditorias`;
+- `/manutencoes`;
+- `/alertas`;
+- `/relatorios`;
+- `/configuracoes`;
+- bundle publicado aponta para Supabase 2;
+- bundle publicado não contém o Supabase original.
 
-## Aplicativo interno
+## Smoke manual autenticado
 
-O projeto usa:
+Aprovado:
 
-- meta robots noindex;
-- robots.txt bloqueando crawlers;
-- X-Robots-Tag.
+- login administrativo;
+- Visão geral;
+- Relatórios;
+- Configurações;
+- `Ctrl+F5` em `/configuracoes`;
+- sessão preservada;
+- sem 404 de SPA.
 
-Isso reduz indexação acidental, mas não substitui autenticação.
+## Google Drive
 
-## PWA
+Integração aprovada:
 
-O service worker:
+Supabase Auth
+→ RBAC
+→ Edge Function
+→ Google Apps Script
+→ Google Drive.
 
-- é gerado pelo vite-plugin-pwa;
-- usa atualização automática;
-- remove caches obsoletos;
-- não cria cache runtime para chamadas autenticadas do Supabase.
+Root folder ID:
 
-Quando offline, o shell pode permanecer disponível, porém operações de dados devem ser consideradas indisponíveis.
+`1COGqF8q93BSwWkhQKPayF337HpzAIkxk`
 
-## Smoke test
+Pastas-base:
 
-Após o primeiro deploy:
+- Ativos
+- Auditorias
+- Estoque
+- Documentos Gerais
 
-`.\scripts\VALIDAR_CLOUDFLARE_PROD.ps1 -BaseUrl "https://SEU-PROJETO.pages.dev"`
+## Edge Functions
 
-Depois testar manualmente:
+Publicadas:
 
-- login;
-- branding;
-- dashboard;
-- patrimônio;
-- estoque;
-- auditorias;
-- manutenção;
-- alertas;
-- relatórios;
-- usuários;
-- logs;
-- configurações;
-- QR/câmera;
-- etiqueta;
-- agente Windows.
+- drive-health
+- evidence-upload
+- evidence-file
+- evidence-revoke
+- admin-users
+- agent-admin
+- agent-ingest
 
-## Domínio
+## Segurança
 
-Adicionar domínio customizado somente depois do smoke test no `pages.dev`.
+Confirmado:
 
-Depois repetir o smoke test no domínio definitivo.
+- `.env.local` não versionado;
+- nenhum shared secret registrado em documentação;
+- nenhum service_role no frontend;
+- nenhum segredo administrativo no agente;
+- CSP normalizada para a Instância 2.
 
-## M11 ainda pendente depois deste macrobloco
+## Próxima etapa
 
-- criar/conectar projeto Pages;
-- primeiro deploy;
-- validar ambiente real;
-- domínio;
-- hardening backend final;
-- backup/restore;
-- assinatura e distribuição do agente.
+O go-live web está concluído.
+
+Próxima etapa obrigatória para finalizar a duplicação integral:
+
+`AGENTE WINDOWS — BUILD + INSTALADOR + TESTE DA INSTÂNCIA 2`
+
+O agente deve operar exclusivamente contra:
+
+`https://yresuszqnakdxupewtsf.supabase.co`
