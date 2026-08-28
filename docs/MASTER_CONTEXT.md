@@ -1,79 +1,63 @@
-# INVENTÁRIO TI — MASTER CONTEXT
+# INVENTÁRIO TI — MASTER CONTEXT — INSTÂNCIA 2
 
-## 1. Identidade do produto
+## 1. Identidade
 
-Nome genérico oficial do aplicativo:
+Produto oficial:
 
 `Inventário TI`
 
-O nome anterior do produto não deve ser usado como marca principal da interface.
+Esta é a segunda instalação independente do produto. Ela não compartilha banco, autenticação, evidências, hospedagem ou usuários com a instalação original.
 
-A organização usuária pode personalizar:
-
-- nome institucional;
-- logomarca PNG;
-- e-mail de suporte;
-- demais parâmetros institucionais disponíveis em Administração → Configurações.
-
-Fallback:
-
-- quando não houver identidade institucional configurada, usar `Inventário TI`.
-
-Repositório e nomes técnicos internos podem continuar usando `wisdom-ti` para preservar compatibilidade e histórico.
+A identidade institucional é configurável pelo próprio aplicativo. O nome técnico histórico `wisdom-ti`, prefixos patrimoniais `WIS-*` e nomes internos do agente podem permanecer para compatibilidade.
 
 ## 2. Estado atual
 
-Projeto funcional concluído até:
+Base funcional concluída:
 
-M10 — Consolidação operacional + identidade institucional + dashboard real + relatórios.
+- M01 — fundação visual e estrutural;
+- M02 — Supabase, Auth, RBAC e RLS;
+- M03 — unidades, ambientes e patrimônio;
+- M04 — estoque e componentes;
+- M05 — auditorias físicas e QR Code;
+- M06 — fotos/evidências e Google Drive;
+- M07 — manutenção, ciclo de vida e descarte;
+- M08 — administração;
+- M09 — agente Windows, inventário automático, divergências e alertas;
+- M09 V2 — instalador gráfico do agente + armazenamento + softwares;
+- M10 — branding institucional + etiquetas + dashboard + relatórios;
+- M11 base — hardening/PWA/Cloudflare herdado do produto original.
 
-Marcos concluídos:
+Status da duplicação da Instância 2:
 
-- M01 — Fundação visual e estrutural.
-- M02 — Supabase, Auth, RBAC e RLS.
-- M03 — Unidades, ambientes e patrimônio.
-- M04 — Estoque e componentes.
-- M05 — Auditorias físicas e QR Code.
-- M06 — Fotos/evidências e Google Drive.
-- M07 — Manutenção, ciclo de vida e descarte.
-- M08 — Administração real.
-- M09 — Agente Windows, inventário automático, divergências e alertas reais.
-- M09 V2 — Instalador gráfico do agente + armazenamento + softwares.
-- M10 — Branding institucional + etiquetas + dashboard real + relatórios + preparação PWA/Cloudflare.
+- GitHub independente: OK;
+- clone local independente: OK;
+- Supabase independente: OK;
+- migrations M02–M10: OK;
+- Edge Functions: OK;
+- Google Apps Script: OK;
+- Google Drive: OK;
+- secrets de integração: OK;
+- frontend local: OK;
+- primeiro administrador: OK;
+- login/RBAC: OK;
+- teste end-to-end Auth → RBAC → Edge Function → Apps Script → Drive: OK;
+- Cloudflare Pages 2: PENDENTE.
 
-Status funcional:
-
-`M10 FUNCIONAL OK`
-
-Não reconstruir M01–M10 sem evidência concreta de regressão.
-
-Próximo marco:
-
-M11 — Produção, Cloudflare Pages, hardening e distribuição do agente.
-
-## 3. Repositório e ambiente
+## 3. Ambiente e repositório
 
 Projeto local:
 
-`C:\Projetos\TI Wisdom\wisdom-ti`
+`C:\Projetos\Inventario TI - Instancia 2\inventario-ti`
 
-Backups:
+Repositório oficial desta instância:
 
-`C:\Projetos\TI Wisdom\_backups\wisdom-ti`
-
-Build externo do agente:
-
-`C:\Projetos\TI Wisdom\_builds\wisdom-ti-agent`
-
-Repositório:
-
-`https://github.com/wisdomcontrole-ssa/Wisdom-TI.git`
+`https://github.com/juliocpsprof-afk/Inventario-TI.git`
 
 Branch:
 
 `main`
 
-Ambiente principal:
+Ambiente local:
 
 - Windows;
 - VS Code;
@@ -83,77 +67,36 @@ Ambiente principal:
 - Supabase CLI;
 - .NET 10 SDK.
 
+Backups e segredos locais da duplicação ficam fora do repositório.
+
 ## 4. Supabase oficial
 
 Project Ref:
 
-`dqfbzsneaamihfphjfcj`
+`yresuszqnakdxupewtsf`
 
 Project URL:
 
-`https://dqfbzsneaamihfphjfcj.supabase.co`
+`https://yresuszqnakdxupewtsf.supabase.co`
 
 Regra permanente:
 
-- SQL, Edge Functions, ambiente frontend e agente devem apontar para esse projeto;
-- não usar outros projetos Supabase existentes na conta;
-- validar Project Ref antes de deploys administrativos.
+- frontend, scripts operacionais, Edge Functions e agente desta instância devem usar somente esse projeto;
+- não apontar a Instância 2 para outro Supabase;
+- validar o Project Ref antes de deploys administrativos.
 
-## 5. Stack consolidada
-
-Frontend/PWA:
-
-- React;
-- TypeScript;
-- Vite;
-- Tailwind CSS;
-- React Router;
-- Lucide;
-- vite-plugin-pwa;
-- html5-qrcode;
-- react-qr-code.
-
-Backend:
-
-- Supabase PostgreSQL;
-- Supabase Auth;
-- RLS;
-- RBAC;
-- RPCs PostgreSQL;
-- Supabase Storage;
-- Supabase Edge Functions;
-- pg_cron.
-
-Evidências:
-
-React → Supabase → Edge Function → Google Apps Script → Google Drive.
-
-Agente Windows:
-
-- C#/.NET 10;
-- self-contained win-x64;
-- WinForms para instalador gráfico;
-- CIM/PowerShell interno para inventário;
-- HTTPS;
-- token individual;
-- MachineGuid;
-- tarefas agendadas;
-- heartbeat;
-- histórico de snapshots.
-
-Hospedagem:
-
-- preparada para Cloudflare Pages;
-- publicação de produção ainda é pendência do M11.
-
-## 6. Variáveis e secrets
+## 5. Variáveis e secrets
 
 Frontend:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-M06 Edge Functions:
+Valor esperado para `VITE_SUPABASE_URL`:
+
+`https://yresuszqnakdxupewtsf.supabase.co`
+
+M06 / Edge Functions:
 
 - `GOOGLE_APPS_SCRIPT_URL`
 - `GOOGLE_APPS_SCRIPT_SHARED_SECRET`
@@ -163,53 +106,148 @@ Google Apps Script:
 - `WISDOM_SHARED_SECRET`
 - `WISDOM_ROOT_FOLDER_ID`
 
-Nunca versionar valores reais.
+Nunca versionar valores reais de secrets.
 
-Nunca colocar no frontend ou agente:
+Nunca colocar no frontend ou no agente:
 
 - service_role;
 - secret key;
 - senha PostgreSQL;
 - senha administrativa;
-- secrets Google;
+- Google shared secret;
+- Supabase access token;
 - tokens administrativos.
 
-## 7. Segurança
+## 6. Banco e migrations
 
-Backend é a autoridade de permissão.
+Histórico remoto/local validado com:
 
-Frontend pode ocultar ações, mas isso não substitui:
+`supabase db push --dry-run --include-all`
 
-- RLS;
-- RBAC;
-- validação em RPC;
-- validação em Edge Function.
+Resultado esperado e já obtido:
 
-Operações críticas devem registrar:
+`Remote database is up to date.`
 
-- usuário;
-- data/hora;
-- ação;
-- antes/depois quando aplicável;
-- justificativa quando necessária.
+Migrations:
 
-Agente:
+- `20260813_190000_m02_foundation.sql`
+- `20260814_090000_m03_assets_locations.sql`
+- `20260815_090000_m04_stock_components.sql`
+- `20260818_160000_m05_auditorias_qr.sql`
+- `20260820_090000_m06_evidence_metadata.sql`
+- `20260825_093600_m07_maintenance_lifecycle.sql`
+- `20260826110000_m08_administration.sql`
+- `20260826150000_m09_agent_inventory_alerts.sql`
+- `20260826170000_m10_consolidation_branding_reports.sql`
 
-- token começa com `wti_`;
-- banco guarda hash SHA-256;
-- token é individual;
-- token pode ser rotacionado;
-- agente pode ser revogado;
-- MachineGuid impede reutilização indevida em outra máquina;
-- HTTPS obrigatório.
+### Recuperação de migrations
 
-Branding:
+As migrations M03, M04 e M06 não existiam no repositório recebido pela Instância 2.
 
-- logomarca é pública por desenho, pois precisa aparecer antes do login e nas etiquetas;
-- escrita da logo exige `settings.manage`;
-- somente PNG;
-- limite de 2 MB;
-- arquivo público não contém informação sensível.
+Elas foram reconstruídas usando:
+
+- contrato real do frontend;
+- contratos das Edge Functions;
+- validadores;
+- documentação;
+- dependências das migrations posteriores.
+
+As migrations M08/M09/M10 originalmente compartilhavam uma versão curta `20260826`. A CLI usa a versão da migration como chave única no histórico remoto. Elas foram normalizadas para versões únicas:
+
+- M08 → `20260826110000`
+- M09 → `20260826150000`
+- M10 → `20260826170000`
+
+O histórico remoto foi normalizado e o banco foi validado após essa alteração.
+
+Regra:
+
+não renomear nem reescrever novamente migrations já aplicadas sem necessidade técnica concreta.
+
+## 7. Estrutura consolidada do banco
+
+### M02
+
+- roles
+- permissions
+- role_permissions
+- profiles
+- units
+- environments
+- audit_logs
+- `has_permission(text)`
+- `get_my_access_context()`
+
+### M03
+
+- asset_types
+- assets
+- asset_movements
+- asset_code_seq
+- `move_asset()`
+
+### M04
+
+- stock_products
+- stock_units
+- asset_components
+- stock_movements
+- stock_unit_code_seq
+- `install_stock_unit()`
+- `remove_stock_unit()`
+- `move_stock_unit()`
+- `change_stock_unit_status()`
+
+### M05
+
+- audit_cycles
+- audit_items
+- audit_scan_events
+- audit_cycle_code_seq
+- `create_physical_audit()`
+- `register_audit_scan()`
+- `update_audit_item_note()`
+- `close_physical_audit()`
+- `cancel_physical_audit()`
+
+### M06
+
+- evidence_categories
+- evidence_files
+
+### M07
+
+- maintenance_orders
+- maintenance_parts
+- maintenance_events
+- asset_lifecycle_events
+- asset_disposals
+- RPCs de manutenção, baixa e descarte
+
+### M08
+
+- system_settings
+- `update_system_setting()`
+
+### M09
+
+- agent_devices
+- agent_inventory_expectations
+- agent_inventory_snapshots
+- agent_divergences
+- system_alerts
+- `set_asset_inventory_expectation()`
+- `update_system_alert_status()`
+- `refresh_agent_connectivity_alerts()`
+
+### M10
+
+- permissão `reports.view`
+- bucket `institution-branding`
+- setting `branding.logo_path`
+- `get_public_branding()`
+- `get_dashboard_summary()`
+- `get_operational_report(text)`
 
 ## 8. RBAC
 
@@ -247,139 +285,77 @@ Permissões principais:
 - settings.manage
 - logs.view
 
-Funções-base:
+O backend é a autoridade de permissão. O frontend pode ocultar ações, mas isso não substitui RLS/RBAC/RPC/Edge Function.
 
-- `public.has_permission(text)`
-- `public.get_my_access_context()`
+## 9. Edge Functions
 
-## 9. Banco consolidado
+Publicadas na Instância 2:
 
-M02:
+- `drive-health`
+- `evidence-upload`
+- `evidence-file`
+- `evidence-revoke`
+- `admin-users`
+- `agent-admin`
+- `agent-ingest`
 
-- roles
-- permissions
-- role_permissions
-- profiles
-- units
-- environments
-- audit_logs
+`agent-ingest` usa autenticação própria do agente e foi publicado sem verificação JWT do gateway.
 
-M03:
+As demais funções seguem Auth/RBAC do produto.
 
-- asset_types
-- assets
-- asset_movements
-- asset_code_seq
-- `move_asset()`
+## 10. Evidências e Google Drive
 
-M04:
+Arquitetura:
 
-- stock_products
-- stock_units
-- asset_components
-- stock_movements
-- stock_unit_code_seq
-- `install_stock_unit()`
-- `remove_stock_unit()`
-- `move_stock_unit()`
-- `change_stock_unit_status()`
+React
+→ Supabase Auth/RBAC
+→ Supabase Edge Function
+→ Google Apps Script
+→ Google Drive
 
-M05:
+Apps Script Web App:
 
-- audit_cycles
-- audit_items
-- audit_scan_events
-- audit_cycle_code_seq
-- `create_physical_audit()`
-- `register_audit_scan()`
-- `update_audit_item_note()`
-- `close_physical_audit()`
-- `cancel_physical_audit()`
+`https://script.google.com/macros/s/AKfycbzbakPvXXvFIlj3zOELl9pRFpSb9NJaWjkp77O3b07izbAmA4XcjEMYwHqWWYLAiunIMQ/exec`
 
-M06:
+Google Drive root folder ID:
 
-- evidence_categories
-- evidence_files
+`1COGqF8q93BSwWkhQKPayF337HpzAIkxk`
 
-M07:
+Pastas-base validadas:
 
-- maintenance_orders
-- maintenance_parts
-- maintenance_events
-- asset_lifecycle_events
-- asset_disposals
+- Ativos
+- Auditorias
+- Estoque
+- Documentos Gerais
 
-M07 RPCs:
+Limite atual de evidência:
 
-- `create_maintenance_order()`
-- `update_maintenance_order()`
-- `add_maintenance_part()`
-- `remove_maintenance_part()`
-- `complete_maintenance_order()`
-- `cancel_maintenance_order()`
-- `retire_asset()`
-- `dispose_asset()`
+5 MB.
 
-M08:
+Categorias:
 
-- system_settings
-- `update_system_setting()`
+- registration
+- audit
+- movement
+- maintenance
+- disposal
+- stock
+- other
 
-M09:
+Revogação:
 
-- agent_devices
-- agent_inventory_expectations
-- agent_inventory_snapshots
-- agent_divergences
-- system_alerts
+- lógica;
+- não destrutiva;
+- metadados preservados.
 
-M09 RPCs:
+Teste realizado e aprovado:
 
-- `set_asset_inventory_expectation()`
-- `update_system_alert_status()`
-- `refresh_agent_connectivity_alerts()`
-
-M10:
-
-- nova permissão `reports.view`;
-- bucket Storage `institution-branding`;
-- setting `branding.logo_path`;
-- `get_public_branding()`;
-- `get_dashboard_summary()`;
-- `get_operational_report(text)`.
-
-Migração M10:
-
-`supabase/migrations/20260826_170000_m10_consolidation_branding_reports.sql`
-
-Histórico SQL:
-
-`supabase/sql-history/M10_SUPABASE.sql`
-
-SQL M10 aplicado e funcionalmente validado no projeto oficial.
-
-## 10. Edge Functions
-
-M06:
-
-- drive-health
-- evidence-upload
-- evidence-file
-- evidence-revoke
-
-M08:
-
-- admin-users
-
-M09:
-
-- agent-admin
-- agent-ingest
-
-M10:
-
-- nenhuma nova Edge Function;
-- nenhum novo secret.
+Supabase Auth
+→ RBAC `settings.manage`
+→ `drive-health`
+→ Supabase secrets
+→ Apps Script
+→ Google Drive.
 
 ## 11. Patrimônio
 
@@ -459,33 +435,7 @@ Métodos:
 - manual;
 - arquivo.
 
-## 14. Evidências
-
-Arquitetura oficial:
-
-React → Supabase Auth/RBAC → Edge Function → Google Apps Script → DriveApp → Google Drive.
-
-Categorias:
-
-- registration
-- audit
-- movement
-- maintenance
-- disposal
-- stock
-- other
-
-Limite:
-
-5 MB.
-
-Revogação:
-
-- lógica;
-- não destrutiva;
-- preserva metadados.
-
-## 15. Manutenção e ciclo de vida
+## 14. Manutenção e ciclo de vida
 
 Códigos:
 
@@ -502,12 +452,7 @@ Regras:
 - descarte bloqueado com componente instalado;
 - histórico preservado.
 
-Rotas:
-
-- `/manutencoes`
-- `/manutencoes/:maintenanceId`
-
-## 16. Administração
+## 15. Administração
 
 Usuários:
 
@@ -518,12 +463,13 @@ Usuários:
 - proteção contra remover último admin;
 - auditoria.
 
-Logs:
+Primeiro administrador da Instância 2:
 
-- audit_logs reais;
-- filtros;
-- before/after;
-- metadata.
+- criado;
+- autenticação validada;
+- acesso administrativo validado.
+
+Não registrar e-mail ou senha neste documento.
 
 Configurações:
 
@@ -532,138 +478,17 @@ Configurações:
 - logo;
 - parâmetros operacionais.
 
-## 17. Agente Windows
-
-### 17.1 Projeto
-
-Agente:
-
-`agent/WisdomTI.Agent`
-
-Instalador gráfico:
-
-`agent/WisdomTI.Agent.Setup`
-
-Build:
-
-`.NET 10`
-
-Runtime:
-
-`win-x64 self-contained`
-
-Instalador oficial:
-
-`WisdomTI-Agent-Setup.exe`
-
-Fluxo normal:
-
-1. abrir ativo;
-2. criar/rotacionar token;
-3. copiar token;
-4. executar Setup EXE;
-5. aceitar UAC;
-6. colar token;
-7. instalar.
-
-PowerShell não faz parte do fluxo normal do usuário.
-
-### 17.2 Coleta
-
-Máquina:
-
-- MachineGuid;
-- hostname;
-- fabricante;
-- modelo;
-- serial.
-
-Sistema:
-
-- Windows;
-- versão;
-- build;
-- arquitetura;
-- boot.
-
-Hardware:
-
-- CPU;
-- cores;
-- processadores lógicos;
-- RAM.
-
-Armazenamento:
-
-- volume;
-- capacidade;
-- livre;
-- usado;
-- disco de sistema.
-
-Software:
-
-- nome;
-- versão;
-- publisher;
-- HKLM 64-bit;
-- WOW6432Node;
-- HKCU;
-- deduplicação;
-- limite de 2000.
-
-### 17.3 Heartbeat
-
-Tarefas:
-
-- `Wisdom TI Agent - Startup`
-- `Wisdom TI Agent - Heartbeat`
-
-Heartbeat:
-
-15 minutos.
-
-Offline:
-
-mais de 30 minutos sem comunicação.
-
-### 17.4 Alertas
-
-Categorias:
-
-- connectivity
-- identity
-- hardware
-- software
-- health
-
-Status:
-
-- open
-- acknowledged
-- resolved
-
-## 18. M10 — Identidade institucional
+## 16. Branding
 
 Nome genérico:
 
 `Inventário TI`
 
-Contexto:
+Branding configurável:
 
-`src/branding/BrandContext.tsx`
-
-Serviço:
-
-`src/branding/branding-service.ts`
-
-Marca dinâmica:
-
-`src/components/brand/WisdomMark.tsx`
-
-Administração:
-
-`src/pages/SettingsPage.tsx`
+- nome institucional;
+- e-mail de suporte;
+- logo PNG.
 
 Storage:
 
@@ -676,100 +501,23 @@ Objeto:
 Regras:
 
 - PNG;
-- máximo 2 MB;
+- até 2 MB;
 - leitura pública;
-- insert/update/delete somente com `settings.manage`.
+- escrita protegida por `settings.manage`.
 
-RPC público:
+## 17. Dashboard e relatórios
 
-`get_public_branding()`
+Dashboard:
 
-Expõe somente:
-
-- product_name;
-- organization_name;
-- support_email;
-- logo_path;
-- updated_at.
-
-Não expõe configurações administrativas ou secrets.
-
-Uso:
-
-- login;
-- sidebar/menu;
-- cabeçalhos apropriados;
-- etiqueta patrimonial.
-
-## 19. Etiqueta patrimonial M10
-
-Componente:
-
-`src/components/assets/AssetQrLabelCard.tsx`
-
-A etiqueta imprime:
-
-- logo institucional quando configurada;
-- nome da instituição;
-- Inventário TI;
-- código patrimonial;
-- QR Code;
-- tipo do ativo;
-- fabricante/modelo;
-- serial quando existente.
-
-Formato de impressão preparado para etiqueta compacta.
-
-Fallback sem logo continua funcional.
-
-## 20. Dashboard real M10
-
-Página:
-
-`src/pages/DashboardPage.tsx`
-
-Serviço:
-
-`getDashboardSummary()`
-
-RPC:
-
-`get_dashboard_summary()`
-
-Indicadores:
-
-- total de ativos;
-- ativos em operação;
+- dados reais;
+- ativos;
 - estoque;
-- manutenções;
+- manutenção;
 - auditorias;
 - alertas;
-- agentes online/offline;
+- agentes;
 - divergências;
-- ativos sem localização;
-- saúde operacional;
-- alertas recentes;
-- manutenções recentes.
-
-Não usar mock no dashboard concluído.
-
-## 21. Relatórios M10
-
-Rota:
-
-`/relatorios`
-
-Página:
-
-`src/pages/ReportsPage.tsx`
-
-Permissão:
-
-`reports.view`
-
-RPC:
-
-`get_operational_report(text)`
+- saúde operacional.
 
 Relatórios:
 
@@ -780,170 +528,192 @@ Relatórios:
 - alerts;
 - agents.
 
-Funcionalidades:
+Permissão:
 
-- consulta;
-- filtro/busca;
-- tabela responsiva;
-- exportação CSV UTF-8;
-- limite backend de 5000 registros por execução.
+`reports.view`
 
-## 22. PWA e preparação Cloudflare
+Exportação:
 
-Nome PWA:
+CSV UTF-8.
 
-`Inventário TI`
+Limite backend atual:
 
-Arquivos principais:
+5000 registros por execução.
 
-- `vite.config.ts`
-- `public/inventario-ti.svg`
-- `public/_redirects`
+## 18. Agente Windows
 
-SPA fallback:
+Projetos:
 
-`/* /index.html 200`
+- `agent/WisdomTI.Agent`
+- `agent/WisdomTI.Agent.Setup`
 
-Code splitting:
+Runtime:
 
-- React;
-- Supabase;
-- QR.
+- .NET 10;
+- win-x64 self-contained;
+- instalador WinForms.
 
-A publicação real em Cloudflare Pages ainda não foi executada.
+Autenticação:
 
-Documento:
+- token individual começando com `wti_`;
+- SHA-256 armazenado no banco;
+- MachineGuid;
+- HTTPS.
 
-`docs/M10_DEPLOY_CLOUDFLARE.md`
+Coleta:
 
-## 23. Rotas atuais
+- hostname;
+- fabricante;
+- modelo;
+- serial;
+- Windows;
+- CPU;
+- RAM;
+- discos;
+- softwares.
 
-- /login
-- /dashboard
-- /patrimonio
-- /patrimonio/:assetId
-- /ativo/:assetCode
-- /estoque
-- /estoque/:stockUnitId
-- /auditorias
-- /auditorias/:auditId
-- /manutencoes
-- /manutencoes/:maintenanceId
-- /alertas
-- /ambientes
-- /relatorios
-- /usuarios
-- /logs
-- /configuracoes
-- /sem-permissao
+Heartbeat:
 
-## 24. Testes M10 realizados
+15 minutos.
 
-M10 foi validado funcionalmente pelo usuário.
+Offline:
 
-Validações:
+mais de 30 minutos sem comunicação.
 
-- instalação macrobloco OK;
-- TypeScript build OK;
-- Vite build OK;
-- lint sem erros bloqueantes;
-- SQL M10 aplicado;
-- branding funcional;
-- logo PNG funcional;
-- identidade no aplicativo;
-- etiqueta personalizada funcional;
-- dashboard real funcional;
-- relatórios funcionais;
-- busca de relatórios funcional;
-- CSV funcional;
-- regressão operacional aceita;
-- resultado final: `M10 FUNCIONAL OK`.
+Categorias de alerta:
 
-## 25. Bugs conhecidos / observações
+- connectivity
+- identity
+- hardware
+- software
+- health
 
-Agente:
+Antes de distribuir o agente da Instância 2, todo endpoint Supabase embutido no instalador/scripts deve apontar para:
 
-- ainda sem assinatura digital;
-- SmartScreen pode alertar;
-- atualização automática do agente ainda não implementada.
+`https://yresuszqnakdxupewtsf.supabase.co`
 
-PWA:
+## 19. PWA e Cloudflare
 
-- manifest usa identidade genérica Inventário TI;
-- nome/logo da instituição são carregados dinamicamente após iniciar o app.
+Base PWA/hardening já existente:
 
-Relatórios:
+- Vite;
+- vite-plugin-pwa;
+- `public/_redirects`;
+- `public/_headers`;
+- CSP;
+- cache;
+- robots noindex;
+- ConnectivityBanner;
+- preparação de smoke tests.
 
-- limite atual de 5000 registros por execução;
-- paginação/exportação em lote pode ser adicionada se escala exigir.
+Cloudflare Pages da Instância 2:
 
-Branding:
+`PENDENTE`
 
-- apenas PNG;
-- limite 2 MB;
-- substituir a logo reutiliza o mesmo objeto público com versionamento por query string.
+Configuração esperada:
 
-Cloudflare:
+- repositório: `juliocpsprof-afk/Inventario-TI`
+- branch: `main`
+- build command: `npm run build`
+- output directory: `dist`
+- root directory: vazio
+- variáveis:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-- ainda não publicado em produção.
+Após obter a URL Pages:
 
-## 26. Próximo marco — M11
+- configurar URL de convite/redirect quando necessário;
+- executar smoke test;
+- validar login;
+- validar PWA;
+- validar QR/câmera em HTTPS;
+- atualizar este documento com a URL oficial.
 
-M11 — Produção + hardening final.
+## 20. Segurança
 
-Macroescopo:
+Nunca versionar:
 
-1. Cloudflare Pages:
-   - conectar GitHub;
-   - configurar build;
-   - cadastrar variáveis frontend;
-   - domínio;
-   - HTTPS;
-   - deploy;
-   - rollback;
-   - smoke tests.
+- `.env.local`;
+- senha PostgreSQL;
+- Supabase access token;
+- service_role;
+- Supabase secret key;
+- Google shared secret;
+- senha administrativa;
+- tokens individuais do agente.
 
-2. PWA:
-   - instalação real;
-   - atualização;
-   - cache;
-   - offline controlado;
-   - câmera/QR em HTTPS.
+Operações críticas devem registrar:
 
-3. Hardening:
-   - revisão RLS/RBAC;
-   - revisão Storage;
-   - CSP/headers;
-   - tratamento de erros;
-   - rate limiting onde aplicável;
-   - retenção de snapshots;
-   - observabilidade;
-   - backups/restore.
+- usuário;
+- data/hora;
+- ação;
+- antes/depois quando aplicável;
+- justificativa quando necessária.
 
-4. Agente:
-   - assinatura digital;
-   - versionamento formal;
-   - estratégia de update;
-   - distribuição;
-   - documentação para técnicos.
+## 21. Testes realizados na duplicação
 
-5. Produção:
-   - smoke tests completos;
-   - checklist operacional;
-   - documentação de implantação;
-   - atualização final deste MASTER_CONTEXT.
+- mirror GitHub com histórico: OK;
+- clone local separado: OK;
+- Supabase link: OK;
+- migrations M02–M10: OK;
+- migration history: OK;
+- dry-run remoto: `Remote database is up to date`;
+- dependências npm: OK;
+- TypeScript/Vite build: OK;
+- lint: 0 erros; warnings não bloqueantes;
+- Edge Functions publicadas: OK;
+- Apps Script health: OK;
+- Google Drive root: OK;
+- pastas-base: OK;
+- Supabase secrets: OK;
+- `.env.local`: OK;
+- primeiro admin: OK;
+- login administrativo: OK;
+- RBAC: OK;
+- `drive-health` end-to-end: OK.
 
-## 27. Retomada
+## 22. Pendências
+
+Bloqueantes para go-live:
+
+1. normalizar referências operacionais da instalação;
+2. commit/push da Instância 2;
+3. criar Cloudflare Pages na nova conta;
+4. cadastrar variáveis do frontend;
+5. obter URL Pages;
+6. revisar redirects/site URL;
+7. executar smoke test de produção;
+8. validar agente da Instância 2;
+9. atualizar este MASTER_CONTEXT após go-live.
+
+Não bloqueantes:
+
+- assinatura digital do agente;
+- auto-update do agente;
+- ARM64;
+- observabilidade avançada;
+- paginação/exportação em lote.
+
+## 23. Próxima etapa
+
+Etapa imediata após este contexto:
+
+`CLOUDFLARE PAGES — INSTÂNCIA 2`
+
+## 24. Retomada em novo chat
 
 Ao iniciar novo chat:
 
-1. ler `docs/MASTER_CONTEXT.md`;
-2. considerar M01–M10 concluídos;
-3. não reconstruir módulos anteriores sem regressão concreta;
-4. Supabase oficial é `dqfbzsneaamihfphjfcj`;
-5. produto genérico é `Inventário TI`;
-6. branding institucional é configurável;
-7. agente Windows está funcional;
-8. dashboard e relatórios usam dados reais;
-9. próximo marco é M11 — publicação/hardening.
-
+1. ler este documento primeiro;
+2. tratar esta instalação como totalmente independente;
+3. repositório oficial: `https://github.com/juliocpsprof-afk/Inventario-TI.git`;
+4. Supabase oficial: `yresuszqnakdxupewtsf`;
+5. URL Supabase: `https://yresuszqnakdxupewtsf.supabase.co`;
+6. Apps Script/Drive já estão conectados;
+7. primeiro admin/login já foram validados;
+8. banco M02–M10 já está aplicado;
+9. M03/M04/M06 foram recuperadas;
+10. M08/M09/M10 possuem versões normalizadas;
+11. não reconstruir M01–M10 sem regressão concreta;
+12. próxima grande etapa: Cloudflare Pages 2 + go-live.

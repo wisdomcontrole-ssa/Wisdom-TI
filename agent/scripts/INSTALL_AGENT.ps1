@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$AgentToken,
 
-    [string]$ProjectUrl = 'https://dqfbzsneaamihfphjfcj.supabase.co'
+    [string]$ProjectUrl = 'https://yresuszqnakdxupewtsf.supabase.co'
 )
 
 Set-StrictMode -Version 2.0

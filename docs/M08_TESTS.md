@@ -13,7 +13,7 @@
 Executar:
 
 ```powershell
-Set-Location "C:\Projetos\TI Wisdom\wisdom-ti"
+Set-Location "C:\Projetos\Inventario TI - Instancia 2\inventario-ti"
 & ".\scripts\VALIDAR_M08.ps1"
 ```
 

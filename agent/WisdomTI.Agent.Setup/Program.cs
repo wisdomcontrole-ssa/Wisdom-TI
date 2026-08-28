@@ -17,7 +17,7 @@ internal static class Program
 
 internal sealed class SetupForm : Form
 {
-    private const string ProjectUrl = "https://dqfbzsneaamihfphjfcj.supabase.co";
+    private const string ProjectUrl = "https://yresuszqnakdxupewtsf.supabase.co";
 
     private readonly TextBox _tokenBox = new();
     private readonly Button _installButton = new();

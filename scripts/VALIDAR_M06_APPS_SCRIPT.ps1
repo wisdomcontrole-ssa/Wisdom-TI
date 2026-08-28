@@ -2,7 +2,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$ProjectRoot = "C:\Projetos\TI Wisdom\wisdom-ti"
+$ProjectRoot = "C:\Projetos\Inventario TI - Instancia 2\inventario-ti"
 
 $Required = @(
     "supabase\functions\_shared\apps-script.ts",

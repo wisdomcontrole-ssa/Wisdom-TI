@@ -2,7 +2,7 @@
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$ProjectRoot = 'C:\Projetos\TI Wisdom\wisdom-ti'
+$ProjectRoot = 'C:\Projetos\Inventario TI - Instancia 2\inventario-ti'
 $AgentProject = Join-Path $ProjectRoot 'agent\WisdomTI.Agent\WisdomTI.Agent.csproj'
 $SetupProject = Join-Path $ProjectRoot 'agent\WisdomTI.Agent.Setup\WisdomTI.Agent.Setup.csproj'
 $AgentScripts = Join-Path $ProjectRoot 'agent\scripts'

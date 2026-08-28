@@ -1,7 +1,7 @@
 #requires -Version 5.1
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-$ProjectRoot = "C:\Projetos\TI Wisdom\wisdom-ti"
+$ProjectRoot = "C:\Projetos\Inventario TI - Instancia 2\inventario-ti"
 Set-Location $ProjectRoot
 
 if (-not (Test-Path ".\.env.local")) {

@@ -4,7 +4,7 @@
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=(), usb=()
   X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://dqfbzsneaamihfphjfcj.supabase.co; font-src 'self' data:; connect-src 'self' https://dqfbzsneaamihfphjfcj.supabase.co wss://dqfbzsneaamihfphjfcj.supabase.co; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob:;
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://yresuszqnakdxupewtsf.supabase.co; font-src 'self' data:; connect-src 'self' https://yresuszqnakdxupewtsf.supabase.co wss://yresuszqnakdxupewtsf.supabase.co; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob:;
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

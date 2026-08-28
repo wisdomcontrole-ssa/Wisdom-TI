@@ -41,7 +41,7 @@ Cadastrar em Production e Preview:
 
 Os valores devem corresponder ao projeto Supabase oficial:
 
-`dqfbzsneaamihfphjfcj`
+`yresuszqnakdxupewtsf`
 
 Nunca cadastrar no frontend:
 

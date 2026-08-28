@@ -4,7 +4,7 @@
 2. No PowerShell, copie a migration:
 
 ```powershell
-Set-Location "C:\Projetos\TI Wisdom\wisdom-ti"
+Set-Location "C:\Projetos\Inventario TI - Instancia 2\inventario-ti"
 Get-Content -Raw ".\supabase\migrations\20260813_190000_m02_foundation.sql" | Set-Clipboard
 ```
 
@@ -15,7 +15,7 @@ Get-Content -Raw ".\supabase\migrations\20260813_190000_m02_foundation.sql" | Se
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
-& "C:\Projetos\TI Wisdom\wisdom-ti\scripts\CONFIGURAR_SUPABASE_M02.ps1"
+& "C:\Projetos\Inventario TI - Instancia 2\inventario-ti\scripts\CONFIGURAR_SUPABASE_M02.ps1"
 ```
 
 7. Cole apenas Project URL e Publishable key quando solicitado.

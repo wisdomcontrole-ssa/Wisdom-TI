@@ -2,7 +2,7 @@
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$ProjectRoot = 'C:\Projetos\TI Wisdom\wisdom-ti'
+$ProjectRoot = 'C:\Projetos\Inventario TI - Instancia 2\inventario-ti'
 Set-Location $ProjectRoot
 
 function Ok([string]$Text) {
@@ -31,7 +31,7 @@ foreach ($needle in @(
     'X-Frame-Options: DENY',
     'Permissions-Policy:',
     'X-Robots-Tag:',
-    'dqfbzsneaamihfphjfcj.supabase.co'
+    'yresuszqnakdxupewtsf.supabase.co'
 )) {
     if (-not $headers.Contains($needle)) {
         throw "Header de producao ausente: $needle"
