@@ -19,7 +19,7 @@ import {
 } from 'react-router'
 import { useAuth } from '../auth/useAuth'
 import { AssetAgentPanel } from '../components/agents/AssetAgentPanel'
-import { InstalledComponentsCard } from '../components/assets/InstalledComponentsCard'
+import { AssetBindingsCard } from '../components/assets/AssetBindingsCard'
 import { AssetQrLabelCard } from '../components/assets/AssetQrLabelCard'
 import { EvidencePanel } from '../components/evidence/EvidencePanel'
 import { AssetLifecyclePanel } from '../components/maintenance/AssetLifecyclePanel'
@@ -444,7 +444,7 @@ export function AssetDetailPage() {
 
       <AssetAgentPanel asset={asset} />
 
-      <InstalledComponentsCard assetId={asset.id} />
+      <AssetBindingsCard assetId={asset.id} />
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <header className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">

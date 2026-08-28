@@ -26,6 +26,10 @@ import { StockDetailPage } from './pages/StockDetailPage'
 import { UnauthorizedPage } from './pages/UnauthorizedPage'
 import { UsersPage } from './pages/UsersPage'
 
+import { FieldScannerPage } from './pages/FieldScannerPage'
+import { IdentifyCodePage } from './pages/IdentifyCodePage'
+import { LabelsPage } from './pages/LabelsPage'
+import { PendingRegistrationsPage } from './pages/PendingRegistrationsPage'
 export default function App() {
   if (!isSupabaseConfigured) {
     return <BackendSetupPage />
@@ -181,6 +185,28 @@ export default function App() {
             <Route
               path="/configuracoes"
               element={<SettingsPage />}
+            />
+          </Route>
+          <Route
+            element={
+              <ProtectedRoute permission="assets.view" />
+            }
+          >
+            <Route
+              path="/escanear"
+              element={<FieldScannerPage />}
+            />
+            <Route
+              path="/identificar/:code"
+              element={<IdentifyCodePage />}
+            />
+            <Route
+              path="/etiquetas"
+              element={<LabelsPage />}
+            />
+            <Route
+              path="/pendencias-cadastro"
+              element={<PendingRegistrationsPage />}
             />
           </Route>
 

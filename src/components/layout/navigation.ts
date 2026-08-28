@@ -3,9 +3,13 @@ import {
   Bell,
   Boxes,
   ClipboardCheck,
+
+  ClipboardClock,
   LayoutDashboard,
   MapPin,
   Monitor,
+
+  Printer,
   ScrollText,
   Settings,
   Users,
@@ -78,7 +82,18 @@ export const mainNavigation: NavigationItem[] = [
     icon: BarChart3,
     permission: 'reports.view',
   },
-]
+  {
+    label: 'Cadastros pendentes',
+    path: '/pendencias-cadastro',
+    icon: ClipboardClock,
+    permission: 'assets.view',
+  },
+  {
+    label: 'Etiquetas',
+    path: '/etiquetas',
+    icon: Printer,
+    permission: 'assets.view',
+  },]
 
 export const adminNavigation: NavigationItem[] = [
   {

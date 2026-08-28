@@ -20,6 +20,7 @@ import { WisdomMark } from '../brand/WisdomMark'
 import { ConnectivityBanner } from '../system/ConnectivityBanner'
 import { mainNavigation } from './navigation'
 import { SidebarContent } from './SidebarContent'
+import { MobileFieldActions } from '../field/MobileFieldActions'
 
 const titles: Record<string, string> = {
   '/dashboard': 'Visão geral',
@@ -193,7 +194,8 @@ export function AppShell() {
         <ConnectivityBanner />
 
         <main className="mx-auto w-full max-w-[1600px] px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8">
-          <Outlet />
+          <MobileFieldActions />
+            <Outlet />
         </main>
       </div>
 
