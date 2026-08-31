@@ -10,6 +10,7 @@ import {
   Monitor,
 
   Printer,
+  Search,
   ScrollText,
   Settings,
   Users,
@@ -89,6 +90,11 @@ export const mainNavigation: NavigationItem[] = [
     permission: 'assets.view',
   },
   {
+    label: 'Localizar ativo',
+    path: '/localizar-ativo',
+    icon: Search,
+    permission: 'assets.view',
+  },  {
     label: 'Etiquetas',
     path: '/etiquetas',
     icon: Printer,

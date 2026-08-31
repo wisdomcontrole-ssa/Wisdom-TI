@@ -36,6 +36,28 @@ export default defineConfig({
         ],
       },
       workbox: {
+        globIgnores: [
+          '**/worker-entry-*.js',
+          '**/ort-wasm-*.wasm',
+          '**/dist-*.js',
+        ],
+        runtimeCaching: [
+          {
+            urlPattern:
+              /\/assets\/(?:worker-entry-|ort-wasm-|dist-).*/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ocr-runtime-v1',
+              expiration: {
+                maxEntries: 12,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+        ],
         cleanupOutdatedCaches: true,
       },
     }),

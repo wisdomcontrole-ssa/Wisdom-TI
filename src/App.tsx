@@ -30,6 +30,7 @@ import { FieldScannerPage } from './pages/FieldScannerPage'
 import { IdentifyCodePage } from './pages/IdentifyCodePage'
 import { LabelsPage } from './pages/LabelsPage'
 import { PendingRegistrationsPage } from './pages/PendingRegistrationsPage'
+import { AssetLookupPage } from './pages/AssetLookupPage'
 export default function App() {
   if (!isSupabaseConfigured) {
     return <BackendSetupPage />
@@ -192,6 +193,10 @@ export default function App() {
               <ProtectedRoute permission="assets.view" />
             }
           >
+            <Route
+              path="/localizar-ativo"
+              element={<AssetLookupPage />}
+            />
             <Route
               path="/escanear"
               element={<FieldScannerPage />}

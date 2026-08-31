@@ -761,3 +761,16 @@ Ao abrir um novo chat:
 12. smoke técnico/manual de produção foi aprovado;
 13. não reconstruir M01–M10 sem regressão concreta;
 14. próxima etapa: build/instalador/teste do agente Windows da Instância 2.
+
+## M13 / DUAS INSTANCIAS - PRE-PUBLICACAO MOBILE
+
+- Base canonica: C:\Projetos\Inventario TI - Canonico\inventario-ti.
+- Instancia 1: GitHub wisdomcontrole-ssa/Wisdom-TI; Supabase dqfbzsneaamihfphjfcj; Cloudflare https://inventario-ti-8s6.pages.dev.
+- Instancia 2: GitHub juliocpsprof-afk/Inventario-TI; Supabase yresuszqnakdxupewtsf; Cloudflare https://inventario-ti-9z1.pages.dev.
+- M12 passa a integrar o mesmo historico de codigo das duas instancias.
+- M13 adiciona OCR local PaddleOCR.js/PP-OCRv5, barcode antes do OCR, revisao humana, Service Tag/Product Number, garantia, NF, instituicoes externas, identificadores externos e busca inteligente.
+- Artefatos pesados de OCR ficam fora do precache inicial da PWA e usam runtime cache.
+- O mesmo commit deve ser publicado nos dois GitHubs.
+- .env.local, secrets, Supabase, Drive e Cloudflare permanecem independentes por instancia.
+- Alteracao pendente em gent/scripts/BUILD_AGENT_PACKAGE.ps1 da antiga pasta da Instancia 2 NAO faz parte deste commit M13.
+- Estado atual: publicacao destinada a teste mobile/HTTPS antes do encerramento definitivo do M13.

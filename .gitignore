@@ -30,3 +30,6 @@ dist-ssr
 *.log
 .DS_Store
 Thumbs.db
+agent/**/bin/
+agent/**/obj/
+supabase/.temp/
