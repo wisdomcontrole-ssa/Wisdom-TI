@@ -4,6 +4,14 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  resolve: {
+    alias: [
+      {
+        find: /^onnxruntime-web$/,
+        replacement: 'onnxruntime-web/wasm',
+      },
+    ],
+  },
   plugins: [
     react(),
     tailwindcss(),
