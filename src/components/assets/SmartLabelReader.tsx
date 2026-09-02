@@ -10,7 +10,11 @@ import {
   Html5Qrcode,
   Html5QrcodeSupportedFormats,
 } from 'html5-qrcode'
-import { useState } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import {
   analyzeAssetLabel,
 } from '../../lib/asset-label-ocr'
@@ -78,6 +82,290 @@ export function SmartLabelReader({
     useState(false)
   const [errorMessage, setErrorMessage] =
     useState<string | null>(null)
+
+  const [cameraOpen, setCameraOpen] =
+    useState(false)
+  const [cameraStarting, setCameraStarting] =
+    useState(false)
+  const [cameraTaking, setCameraTaking] =
+    useState(false)
+  const [cameraError, setCameraError] =
+    useState<string | null>(null)
+  const videoRef =
+    useRef<HTMLVideoElement | null>(null)
+  const streamRef =
+    useRef<MediaStream | null>(null)
+  const cameraSessionRef = useRef(0)
+
+  function stopCameraStream() {
+    streamRef.current?.getTracks()
+      .forEach((track) => track.stop())
+
+    streamRef.current = null
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+  }
+
+  function closeCamera() {
+    cameraSessionRef.current += 1
+    stopCameraStream()
+    setCameraOpen(false)
+    setCameraStarting(false)
+    setCameraTaking(false)
+    setCameraError(null)
+  }
+
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks()
+        .forEach((track) => track.stop())
+      streamRef.current = null
+    }
+  }, [])
+
+  async function waitForCameraView() {
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(
+          () => resolve(),
+        )
+      })
+    })
+  }
+
+  async function requestRearStream() {
+    if (
+      !navigator.mediaDevices
+        ?.getUserMedia
+    ) {
+      throw new Error(
+        'Este navegador não disponibiliza acesso direto à câmera.',
+      )
+    }
+
+    const baseVideo = {
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    }
+
+    try {
+      return await navigator.mediaDevices
+        .getUserMedia({
+          audio: false,
+          video: {
+            ...baseVideo,
+            facingMode: {
+              exact: 'environment',
+            },
+          },
+        })
+    } catch (error) {
+      if (
+        error instanceof DOMException &&
+        (
+          error.name ===
+            'NotAllowedError' ||
+          error.name ===
+            'SecurityError'
+        )
+      ) {
+        throw error
+      }
+
+      const fallback =
+        await navigator.mediaDevices
+          .getUserMedia({
+            audio: false,
+            video: {
+              ...baseVideo,
+              facingMode: {
+                ideal: 'environment',
+              },
+            },
+          })
+
+      const track =
+        fallback.getVideoTracks()[0]
+
+      const settings =
+        track?.getSettings()
+      const label =
+        track?.label.toLowerCase() ??
+        ''
+
+      if (
+        settings?.facingMode ===
+          'user' ||
+        /front|frontal|selfie|user/.test(
+          label,
+        )
+      ) {
+        fallback.getTracks().forEach(
+          (item) => item.stop(),
+        )
+
+        throw new Error(
+          'O navegador selecionou a câmera frontal. A leitura de etiqueta exige a câmera traseira.',
+          { cause: error },
+        )
+      }
+
+      return fallback
+    }
+  }
+
+  async function openRearCamera() {
+    if (disabled || processing) {
+      return
+    }
+
+    const session =
+      cameraSessionRef.current + 1
+
+    cameraSessionRef.current = session
+    stopCameraStream()
+    setCameraError(null)
+    setCameraOpen(true)
+    setCameraStarting(true)
+
+    try {
+      await waitForCameraView()
+
+      const stream =
+        await requestRearStream()
+
+      if (
+        session !==
+        cameraSessionRef.current
+      ) {
+        stream.getTracks().forEach(
+          (track) => track.stop(),
+        )
+        return
+      }
+
+      const video = videoRef.current
+
+      if (!video) {
+        stream.getTracks().forEach(
+          (track) => track.stop(),
+        )
+        throw new Error(
+          'Não foi possível iniciar a visualização da câmera.',
+        )
+      }
+
+      streamRef.current = stream
+      video.srcObject = stream
+      await video.play()
+    } catch (error) {
+      stopCameraStream()
+      setCameraError(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível abrir a câmera traseira.',
+      )
+    } finally {
+      if (
+        session ===
+        cameraSessionRef.current
+      ) {
+        setCameraStarting(false)
+      }
+    }
+  }
+
+  async function captureRearPhoto() {
+    const video = videoRef.current
+
+    if (
+      !video ||
+      video.videoWidth <= 0 ||
+      video.videoHeight <= 0
+    ) {
+      setCameraError(
+        'A câmera ainda não está pronta para fotografar.',
+      )
+      return
+    }
+
+    try {
+      setCameraTaking(true)
+      setCameraError(null)
+
+      const canvas =
+        document.createElement('canvas')
+
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+
+      const context =
+        canvas.getContext('2d')
+
+      if (!context) {
+        throw new Error(
+          'Não foi possível preparar a captura da câmera.',
+        )
+      }
+
+      context.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      )
+
+      const blob =
+        await new Promise<Blob>(
+          (resolve, reject) => {
+            canvas.toBlob(
+              (value) => {
+                if (value) {
+                  resolve(value)
+                  return
+                }
+
+                reject(
+                  new Error(
+                    'Não foi possível gerar a foto da etiqueta.',
+                  ),
+                )
+              },
+              'image/jpeg',
+              0.92,
+            )
+          },
+        )
+
+      const timestamp =
+        new Date()
+          .toISOString()
+          .replace(/[:.]/g, '-')
+
+      const selected = new File(
+        [blob],
+        `etiqueta-${timestamp}.jpg`,
+        {
+          type: 'image/jpeg',
+          lastModified: Date.now(),
+        },
+      )
+
+      closeCamera()
+      await analyze(selected)
+    } catch (error) {
+      setCameraError(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível fotografar a etiqueta.',
+      )
+    } finally {
+      setCameraTaking(false)
+    }
+  }
 
   async function readBarcode(
     selected: File,
@@ -197,31 +485,19 @@ export function SmartLabelReader({
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 text-xs font-bold text-white">
+        <button
+          type="button"
+          onClick={() =>
+            void openRearCamera()
+          }
+          disabled={
+            disabled || processing
+          }
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
           <Camera size={15} />
           Tirar foto
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            disabled={
-              disabled || processing
-            }
-            onChange={(event) => {
-              const selected =
-                event.currentTarget
-                  .files?.[0]
-
-              if (selected) {
-                void analyze(selected)
-              }
-
-              event.currentTarget.value =
-                ''
-            }}
-          />
-        </label>
+        </button>
 
         <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700">
           <FileImage size={15} />
@@ -417,6 +693,104 @@ export function SmartLabelReader({
           >
             Aplicar dados revisados
           </button>
+        </div>
+      )}
+
+      {cameraOpen && (
+        <div className="fixed inset-0 z-[120] flex flex-col bg-slate-950 text-white">
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <div>
+              <div className="text-sm font-black">
+                Fotografar etiqueta
+              </div>
+              <div className="mt-0.5 text-[11px] text-slate-300">
+                Câmera traseira do aparelho
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={closeCamera}
+              className="rounded-xl border border-white/20 px-3 py-2 text-xs font-bold"
+            >
+              Fechar
+            </button>
+          </div>
+
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="h-full w-full object-cover"
+            />
+
+            {cameraStarting && (
+              <div className="absolute inset-0 grid place-items-center bg-black/70">
+                <div className="flex items-center gap-2 rounded-xl bg-black/60 px-4 py-3 text-sm font-semibold">
+                  <Loader2
+                    size={18}
+                    className="animate-spin"
+                  />
+                  Abrindo câmera traseira...
+                </div>
+              </div>
+            )}
+
+            {cameraError && (
+              <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-red-400/40 bg-red-950/90 p-4 text-sm text-red-100">
+                <div className="font-black">
+                  Câmera traseira indisponível
+                </div>
+                <div className="mt-1 text-xs leading-5">
+                  {cameraError}
+                </div>
+              </div>
+            )}
+
+            {!cameraStarting &&
+              !cameraError && (
+              <div className="pointer-events-none absolute inset-6 rounded-2xl border-2 border-white/60">
+                <div className="absolute inset-x-4 bottom-4 rounded-xl bg-black/55 px-3 py-2 text-center text-[11px] font-semibold text-white">
+                  Enquadre toda a etiqueta e mantenha o aparelho firme.
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-[1fr_2fr] gap-2 border-t border-white/10 bg-slate-950 p-4">
+            <button
+              type="button"
+              onClick={closeCamera}
+              className="h-12 rounded-xl border border-white/20 text-sm font-bold"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void captureRearPhoto()
+              }
+              disabled={
+                cameraStarting ||
+                cameraTaking ||
+                Boolean(cameraError)
+              }
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {cameraTaking ? (
+                <Loader2
+                  size={17}
+                  className="animate-spin"
+                />
+              ) : (
+                <Camera size={17} />
+              )}
+              Fotografar etiqueta
+            </button>
+          </div>
         </div>
       )}
     </section>

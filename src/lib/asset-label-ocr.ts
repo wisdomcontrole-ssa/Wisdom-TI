@@ -71,14 +71,22 @@ async function getOcr() {
 
       const created =
         await module.PaddleOCR.create({
-          textDetectionModelName: 'PP-OCRv5_mobile_det',
-          textRecognitionModelName: 'PP-OCRv5_mobile_rec',
+          textDetectionModelName:
+            'PP-OCRv5_mobile_det',
+          textDetectionModelAsset: {
+            url:
+              'https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_det_onnx_infer.tar',
+          },
+          textRecognitionModelName:
+            'PP-OCRv5_mobile_rec',
+          textRecognitionModelAsset: {
+            url:
+              'https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_rec_onnx_infer.tar',
+          },
           worker: true,
           textRecognitionBatchSize: 6,
           ortOptions: {
             backend: 'wasm',
-            wasmPaths:
-              'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/',
             numThreads: 1,
             simd: true,
           },
