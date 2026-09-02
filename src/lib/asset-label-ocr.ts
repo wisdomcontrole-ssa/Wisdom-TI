@@ -71,8 +71,8 @@ async function getOcr() {
 
       const created =
         await module.PaddleOCR.create({
-          lang: 'pt',
-          ocrVersion: 'PP-OCRv5',
+          textDetectionModelName: 'PP-OCRv5_mobile_det',
+          textRecognitionModelName: 'latin_PP-OCRv5_mobile_rec',
           worker: true,
           textRecognitionBatchSize: 6,
           ortOptions: {
