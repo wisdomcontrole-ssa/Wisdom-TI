@@ -116,7 +116,7 @@ export interface LabelSuggestion {
 
 export interface AssetLabelAnalysis {
   engine: 'paddleocr'
-  engineVersion: 'PP-OCRv5'
+  engineVersion: 'PP-OCRv5' | 'Tesseract.js 7.0.0'
   rawText: string
   barcodes: string[]
   fields: {

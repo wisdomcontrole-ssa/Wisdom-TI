@@ -4,14 +4,6 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  resolve: {
-    alias: [
-      {
-        find: /^onnxruntime-web$/,
-        replacement: 'onnxruntime-web/wasm',
-      },
-    ],
-  },
   plugins: [
     react(),
     tailwindcss(),
@@ -45,20 +37,20 @@ export default defineConfig({
       },
       workbox: {
         globIgnores: [
-          '**/worker-entry-*.js',
-          '**/ort-wasm-*.wasm',
-          '**/dist-*.js',
+          '**/ocr/tesseract/**',
         ],
         runtimeCaching: [
           {
             urlPattern:
-              /\/assets\/(?:worker-entry-|ort-wasm-|dist-).*/,
+              /\/ocr\/tesseract\/.*/,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'ocr-runtime-v1',
+              cacheName:
+                'tesseract-runtime-v1',
               expiration: {
-                maxEntries: 12,
-                maxAgeSeconds: 60 * 60 * 24 * 30,
+                maxEntries: 32,
+                maxAgeSeconds:
+                  60 * 60 * 24 * 90,
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -75,25 +67,38 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          const normalized = id.replaceAll('\\', '/')
+          const normalized =
+            id.replaceAll('\\', '/')
 
           if (
-            normalized.includes('/node_modules/html5-qrcode/') ||
-            normalized.includes('/node_modules/react-qr-code/')
+            normalized.includes(
+              '/node_modules/html5-qrcode/',
+            ) ||
+            normalized.includes(
+              '/node_modules/react-qr-code/',
+            )
           ) {
             return 'qr'
           }
 
           if (
-            normalized.includes('/node_modules/@supabase/')
+            normalized.includes(
+              '/node_modules/@supabase/',
+            )
           ) {
             return 'supabase'
           }
 
           if (
-            normalized.includes('/node_modules/react/') ||
-            normalized.includes('/node_modules/react-dom/') ||
-            normalized.includes('/node_modules/react-router/')
+            normalized.includes(
+              '/node_modules/react/',
+            ) ||
+            normalized.includes(
+              '/node_modules/react-dom/',
+            ) ||
+            normalized.includes(
+              '/node_modules/react-router/',
+            )
           ) {
             return 'react'
           }

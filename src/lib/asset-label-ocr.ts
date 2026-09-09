@@ -1,3 +1,8 @@
+import {
+  createWorker,
+  OEM,
+  PSM,
+} from 'tesseract.js'
 import type {
   AssetLabelAnalysis,
   LabelSuggestion,
@@ -9,24 +14,40 @@ interface OcrItem {
   score: number
 }
 
-interface OcrResult {
-  items: OcrItem[]
-  metrics?: {
-    totalMs?: number
-    detectedBoxes?: number
-    recognizedCount?: number
-  }
+interface OcrMetrics {
+  totalMs?: number
+  detectedBoxes?: number
+  recognizedCount?: number
 }
 
-interface PaddleInstance {
-  predict(
-    input: Blob | HTMLCanvasElement,
-    params?: Record<string, unknown>,
-  ): Promise<OcrResult[]>
+interface TesseractProgressMessage {
+  progress?: number
+  status?: string
 }
 
-let instancePromise: Promise<PaddleInstance> | null =
-  null
+type OcrProgressCallback = (
+  progress: number,
+  status: string,
+) => void
+
+type TesseractWorker = Awaited<
+  ReturnType<typeof createWorker>
+>
+
+const TESSERACT_BASE = '/ocr/tesseract'
+const TESSERACT_WORKER =
+  `${TESSERACT_BASE}/worker.min.js`
+const TESSERACT_CORE =
+  `${TESSERACT_BASE}/core`
+const TESSERACT_LANG =
+  `${TESSERACT_BASE}/lang`
+
+let workerPromise:
+  | Promise<TesseractWorker>
+  | null = null
+let progressCallback:
+  | OcrProgressCallback
+  | null = null
 
 function confidenceFromScore(
   score: number,
@@ -48,58 +69,21 @@ function suggestion(
 
   if (!clean) return undefined
 
+  const boundedScore = Math.max(
+    0,
+    Math.min(1, score),
+  )
   const confidence =
-    confidenceFromScore(score)
+    confidenceFromScore(boundedScore)
 
   return {
     value: clean,
-    score,
+    score: boundedScore,
     confidence,
     source,
     requiresReview:
       confidence !== 'high',
   }
-}
-
-async function getOcr() {
-  if (!instancePromise) {
-    instancePromise = (async () => {
-      const module =
-        await import(
-          '@paddleocr/paddleocr-js'
-        )
-
-      const created =
-        await module.PaddleOCR.create({
-          textDetectionModelName:
-            'PP-OCRv5_mobile_det',
-          textDetectionModelAsset: {
-            url:
-              'https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_det_onnx_infer.tar',
-          },
-          textRecognitionModelName:
-            'PP-OCRv5_mobile_rec',
-          textRecognitionModelAsset: {
-            url:
-              'https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_rec_onnx_infer.tar',
-          },
-          worker: true,
-          textRecognitionBatchSize: 6,
-          ortOptions: {
-            backend: 'wasm',
-            numThreads: 1,
-            simd: true,
-          },
-        })
-
-      return created as unknown as PaddleInstance
-    })().catch((error) => {
-      instancePromise = null
-      throw error
-    })
-  }
-
-  return instancePromise
 }
 
 function normalized(text: string) {
@@ -116,6 +100,7 @@ function cleanValue(value: string) {
       /^(?:NO\.?|Nº|NUMBER|NUMERO|NÚMERO)\s*/i,
       '',
     )
+    .replace(/^[=:;#-]+\s*/, '')
     .trim()
 }
 
@@ -128,15 +113,15 @@ function findLabeled(
     index < items.length;
     index += 1
   ) {
-    const line =
-      normalized(items[index].text)
+    const line = normalized(items[index].text)
 
     for (const label of labels) {
       const match = line.match(label)
       if (!match) continue
 
-      const inlineValue =
-        cleanValue(match[1] ?? '')
+      const inlineValue = cleanValue(
+        match[1] ?? '',
+      )
 
       if (inlineValue.length >= 2) {
         return {
@@ -149,8 +134,9 @@ function findLabeled(
       const next = items[index + 1]
 
       if (next) {
-        const nextValue =
-          cleanValue(next.text)
+        const nextValue = cleanValue(
+          next.text,
+        )
 
         if (nextValue.length >= 2) {
           return {
@@ -180,36 +166,47 @@ function manufacturerSuggestion(
     'Samsung',
     'HP',
     'Hewlett-Packard',
+    'Hewlett Packard',
     'Acer',
     'ASUS',
+    'ASUSTeK',
     'Positivo',
     'Epson',
     'Brother',
     'LG',
     'Intelbras',
     'Multilaser',
+    'Apple',
+    'Microsoft',
+    'AOC',
+    'TP-Link',
   ]
 
   for (const item of items) {
-    const line =
-      normalized(item.text)
+    const line = normalized(item.text)
 
     const brand = brands.find(
       (candidate) =>
         new RegExp(
-          `\\b${candidate.replace(
-            '-',
-            '[- ]',
-          )}\\b`,
+          `\\b${candidate
+            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            .replace(/[ -]/g, '[ -]')}\\b`,
           'i',
         ).test(line),
     )
 
     if (brand) {
-      return suggestion(
-        brand === 'Hewlett-Packard'
+      const canonical =
+        /^hewlett[ -]packard$/i.test(
+          brand,
+        )
           ? 'HP'
-          : brand,
+          : /^asustek$/i.test(brand)
+            ? 'ASUS'
+            : brand
+
+      return suggestion(
+        canonical,
         Math.max(item.score, 0.9),
         line,
       )
@@ -223,25 +220,20 @@ function electricalSuggestion(
   items: OcrItem[],
 ) {
   const joined = items
-    .map((item) =>
-      normalized(item.text),
-    )
+    .map((item) => normalized(item.text))
     .join(' · ')
 
-  const voltage =
-    joined.match(
-      /\b(?:INPUT|ENTRADA|ALIMENTA[CÇ][AÃ]O)?\s*:?\s*((?:\d{2,3}\s*[-–]\s*\d{2,3}|\d{2,3})\s*V(?:AC|DC)?)/i,
-    )?.[1]
+  const voltage = joined.match(
+    /\b(?:INPUT|ENTRADA|ALIMENTA[CÇ][AÃ]O)?\s*:?\s*((?:\d{2,3}\s*[-–]\s*\d{2,3}|\d{2,3})\s*V(?:AC|DC)?)/i,
+  )?.[1]
 
-  const frequency =
-    joined.match(
-      /\b(\d{2,3}\s*(?:[-–]\s*\d{2,3}\s*)?HZ)\b/i,
-    )?.[1]
+  const frequency = joined.match(
+    /\b(\d{2,3}\s*(?:[-–]\s*\d{2,3}\s*)?HZ)\b/i,
+  )?.[1]
 
-  const current =
-    joined.match(
-      /\b(\d+(?:[.,]\d+)?\s*A)\b/i,
-    )?.[1]
+  const current = joined.match(
+    /\b(\d+(?:[.,]\d+)?\s*A)\b/i,
+  )?.[1]
 
   const pieces = [
     voltage,
@@ -263,23 +255,24 @@ function electricalSuggestion(
 function parseResult(
   items: OcrItem[],
   barcodes: string[],
-  metrics?: OcrResult['metrics'],
+  rawText: string,
+  metrics?: OcrMetrics,
 ): AssetLabelAnalysis {
   const cleaned = items
     .map((item) => ({
       text: normalized(item.text),
-      score:
-        Number.isFinite(item.score)
-          ? item.score
-          : 0,
+      score: Number.isFinite(item.score)
+        ? item.score
+        : 0,
     }))
     .filter((item) => item.text)
 
   const serviceTag = findLabeled(
     cleaned,
     [
-      /SERVICE\s*TAG(?:\(S\/N\))?\s*[:#-]?\s*(.*)$/i,
+      /SERVICE\s*TAG(?:\s*\(S\/N\))?\s*[:#-]?\s*(.*)$/i,
       /SERVICE\s*CODE\s*[:#-]?\s*(.*)$/i,
+      /EXPRESS\s*SERVICE\s*CODE\s*[:#-]?\s*(.*)$/i,
     ],
   )
 
@@ -287,6 +280,7 @@ function parseResult(
     cleaned,
     [
       /SERIAL\s*(?:NUMBER|NO\.?|#)?\s*[:#-]?\s*(.*)$/i,
+      /SER\.?(?:IAL)?\s*NO\.?\s*[:#-]?\s*(.*)$/i,
       /\bS\/N(?:\s*\(1S\))?\s*[:#-]?\s*(.*)$/i,
       /\bSN\s*[:#-]\s*(.*)$/i,
     ],
@@ -295,9 +289,10 @@ function parseResult(
   const model = findLabeled(
     cleaned,
     [
-      /MODEL\s*(?:ID\.?|NO\.?|NUMBER|CODE)?\s*[:#-]?\s*(.*)$/i,
+      /MODEL\s*(?:ID\.?|NO\.?|NUMBER|NAME|CODE)?\s*[:#-]?\s*(.*)$/i,
       /PRODUCT\s*NAME\s*[:#-]?\s*(.*)$/i,
       /MACHINE\s*TYPE(?:\s*MODEL)?\s*[:#-]?\s*(.*)$/i,
+      /TYPE\s*MODEL\s*[:#-]?\s*(.*)$/i,
     ],
   )
 
@@ -306,29 +301,28 @@ function parseResult(
     [
       /PRODUCT\s*(?:NO\.?|NUMBER|P\/N)\s*[:#-]?\s*(.*)$/i,
       /\bP\/N\s*[:#-]?\s*(.*)$/i,
+      /\bPN\s*[:#-]\s*(.*)$/i,
       /\bPART\s*(?:NO\.?|NUMBER)\s*[:#-]?\s*(.*)$/i,
       /\bFRU\s*P\/N\s*[:#-]?\s*(.*)$/i,
       /\bMTM\s*[:#-]?\s*(.*)$/i,
     ],
   )
 
-  let serviceSuggestion =
-    serviceTag
-      ? suggestion(
-          serviceTag.value,
-          serviceTag.score,
-          serviceTag.source,
-        )
-      : undefined
+  let serviceSuggestion = serviceTag
+    ? suggestion(
+        serviceTag.value,
+        serviceTag.score,
+        serviceTag.source,
+      )
+    : undefined
 
-  let serialSuggestion =
-    serial
-      ? suggestion(
-          serial.value,
-          serial.score,
-          serial.source,
-        )
-      : undefined
+  let serialSuggestion = serial
+    ? suggestion(
+        serial.value,
+        serial.score,
+        serial.source,
+      )
+    : undefined
 
   if (
     !serviceSuggestion &&
@@ -337,15 +331,15 @@ function parseResult(
       /\bDELL\b/i.test(item.text),
     )
   ) {
-    const dellCandidate =
-      barcodes.find((value) =>
+    const dellCandidate = barcodes.find(
+      (value) =>
         /^[A-Z0-9]{7}$/i.test(value),
-      )
+    )
 
     if (dellCandidate) {
       serviceSuggestion = suggestion(
         dellCandidate,
-        0.58,
+        0.62,
         'Código de barras em etiqueta Dell',
       )
     }
@@ -364,18 +358,21 @@ function parseResult(
     ) {
       serialSuggestion = suggestion(
         candidate,
-        0.52,
+        0.56,
         'Código de barras sem rótulo confirmado',
       )
     }
   }
 
   return {
-    engine: 'paddleocr',
-    engineVersion: 'PP-OCRv5',
-    rawText: cleaned
-      .map((item) => item.text)
-      .join('\n'),
+    engine:
+      'tesseract' as AssetLabelAnalysis['engine'],
+    engineVersion: 'Tesseract.js 7.0.0',
+    rawText:
+      rawText.trim() ||
+      cleaned
+        .map((item) => item.text)
+        .join('\n'),
     barcodes,
     fields: {
       manufacturer:
@@ -387,10 +384,8 @@ function parseResult(
             model.source,
           )
         : undefined,
-      serialNumber:
-        serialSuggestion,
-      serviceTag:
-        serviceSuggestion,
+      serialNumber: serialSuggestion,
+      serviceTag: serviceSuggestion,
       productNumber: productNumber
         ? suggestion(
             productNumber.value,
@@ -411,30 +406,181 @@ function parseResult(
   }
 }
 
+async function getWorker() {
+  if (!workerPromise) {
+    workerPromise = (async () => {
+      const worker = await createWorker(
+        'eng',
+        OEM.LSTM_ONLY,
+        {
+          workerPath: TESSERACT_WORKER,
+          corePath: TESSERACT_CORE,
+          langPath: TESSERACT_LANG,
+          workerBlobURL: false,
+          gzip: true,
+          logger: (
+            message: TesseractProgressMessage,
+          ) => {
+            progressCallback?.(
+              Math.max(
+                0,
+                Math.min(
+                  1,
+                  message.progress ?? 0,
+                ),
+              ),
+              message.status ?? 'OCR',
+            )
+          },
+        },
+      )
+
+      await worker.setParameters({
+        tessedit_pageseg_mode:
+          PSM.SPARSE_TEXT,
+        preserve_interword_spaces: '1',
+        user_defined_dpi: '300',
+      })
+
+      return worker
+    })().catch((error) => {
+      workerPromise = null
+      throw error
+    })
+  }
+
+  return workerPromise
+}
+
+function linesFromResult(
+  text: string,
+  confidence: number,
+  blocks:
+    | Array<{
+        paragraphs: Array<{
+          lines: Array<{
+            text: string
+            confidence: number
+          }>
+        }>
+      }>
+    | null
+    | undefined,
+) {
+  const blockLines =
+    blocks
+      ?.flatMap((block) =>
+        block.paragraphs.flatMap(
+          (paragraph) =>
+            paragraph.lines.map(
+              (line) => ({
+                text: line.text,
+                score:
+                  Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      line.confidence ??
+                        confidence,
+                    ),
+                  ) / 100,
+              }),
+            ),
+        ),
+      )
+      .filter((item) =>
+        normalized(item.text),
+      ) ?? []
+
+  if (blockLines.length > 0) {
+    return blockLines
+  }
+
+  const fallbackScore =
+    Math.max(
+      0,
+      Math.min(100, confidence),
+    ) / 100
+
+  return text
+    .split(/\r?\n/)
+    .map((line) => ({
+      text: line,
+      score: fallbackScore,
+    }))
+    .filter((item) =>
+      normalized(item.text),
+    )
+}
+
 export async function analyzeAssetLabel(
   file: File,
   barcodes: string[] = [],
+  onProgress?: OcrProgressCallback,
 ) {
-  const ocr = await getOcr()
+  const startedAt = performance.now()
+  progressCallback = onProgress ?? null
 
-  const [result] = await ocr.predict(
-    file,
-    {
-      textDetLimitSideLen: 1600,
-      textDetBoxThresh: 0.45,
-      textRecScoreThresh: 0.3,
-    },
-  )
+  try {
+    const worker = await getWorker()
 
-  if (!result) {
-    throw new Error(
-      'O OCR não retornou resultado.',
+    progressCallback?.(
+      0.05,
+      'Preparando leitura OCR',
     )
-  }
 
-  return parseResult(
-    result.items ?? [],
-    barcodes,
-    result.metrics,
-  )
+    const result = await worker.recognize(
+      file,
+      {
+        rotateAuto: true,
+      },
+      {
+        text: true,
+        blocks: true,
+      },
+    )
+
+    const rawText = result.data.text ?? ''
+    const items = linesFromResult(
+      rawText,
+      result.data.confidence ?? 0,
+      result.data.blocks,
+    )
+
+    if (
+      items.length === 0 &&
+      barcodes.length === 0
+    ) {
+      throw new Error(
+        'Nenhum texto legível foi encontrado na etiqueta. Aproxime a câmera, evite reflexos e fotografe novamente.',
+      )
+    }
+
+    progressCallback?.(1, 'Leitura concluída')
+
+    return parseResult(
+      items,
+      barcodes,
+      rawText,
+      {
+        totalMs: Math.round(
+          performance.now() - startedAt,
+        ),
+        detectedBoxes: items.length,
+        recognizedCount: items.length,
+      },
+    )
+  } catch (error) {
+    const detail =
+      error instanceof Error
+        ? error.message
+        : String(error)
+
+    throw new Error(
+      `Falha no OCR local Tesseract: ${detail}`,
+      { cause: error },
+    )
+  } finally {
+    progressCallback = null
+  }
 }
