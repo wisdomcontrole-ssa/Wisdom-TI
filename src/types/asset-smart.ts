@@ -115,7 +115,7 @@ export interface LabelSuggestion {
 }
 
 export interface AssetLabelAnalysis {
-  engine: 'paddleocr'
+  engine: 'paddleocr' | 'tesseract'
   engineVersion: 'PP-OCRv5' | 'Tesseract.js 7.0.0'
   rawText: string
   barcodes: string[]
@@ -126,6 +126,12 @@ export interface AssetLabelAnalysis {
     serviceTag?: LabelSuggestion
     productNumber?: LabelSuggestion
     electricalRating?: LabelSuggestion
+    processor?: LabelSuggestion
+    memory?: LabelSuggestion
+    storage?: LabelSuggestion
+    motherboard?: LabelSuggestion
+    operatingSystem?: LabelSuggestion
+    networkAdapter?: LabelSuggestion
   }
   metrics?: {
     totalMs?: number
@@ -141,4 +147,10 @@ export interface ReviewedLabelData {
   serviceTag: string
   productNumber: string
   electricalRating: string
+  processor: string
+  memory: string
+  storage: string
+  motherboard: string
+  operatingSystem: string
+  networkAdapter: string
 }

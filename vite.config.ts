@@ -46,7 +46,7 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName:
-                'tesseract-runtime-v1',
+                'tesseract-runtime-v2',
               expiration: {
                 maxEntries: 32,
                 maxAgeSeconds:

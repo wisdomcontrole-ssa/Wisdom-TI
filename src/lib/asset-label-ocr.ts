@@ -180,6 +180,8 @@ function manufacturerSuggestion(
     'Microsoft',
     'AOC',
     'TP-Link',
+    'Daten',
+    'Login',
   ]
 
   for (const item of items) {
@@ -252,6 +254,56 @@ function electricalSuggestion(
   )
 }
 
+function patternSuggestion(items: OcrItem[], patterns: RegExp[], sourceLabel: string) {
+  for (const item of items) {
+    const line = normalized(item.text)
+    for (const pattern of patterns) {
+      const match = line.match(pattern)
+      const value = cleanValue(match?.[1] ?? '')
+      if (value.length >= 2) {
+        return suggestion(value, Math.max(item.score, 0.68), `${sourceLabel}: ${line}`)
+      }
+    }
+  }
+  return undefined
+}
+
+async function prepareImageForOcr(file: File) {
+  if (!file.type.startsWith('image/')) throw new Error('Selecione uma imagem JPG, PNG ou WebP.')
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch (error) {
+    throw new Error('O formato desta imagem não pôde ser aberto. Converta para JPG ou PNG e tente novamente.', { cause: error })
+  }
+  try {
+    const longest = Math.max(bitmap.width, bitmap.height)
+    const target = Math.min(3200, Math.max(1800, longest))
+    const scale = target / longest
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const context = canvas.getContext('2d', { willReadFrequently: true })
+    if (!context) throw new Error('Não foi possível preparar a imagem para leitura.')
+    context.imageSmoothingEnabled = true
+    context.imageSmoothingQuality = 'high'
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    const image = context.getImageData(0, 0, canvas.width, canvas.height)
+    for (let index = 0; index < image.data.length; index += 4) {
+      const gray = image.data[index] * 0.299 + image.data[index + 1] * 0.587 + image.data[index + 2] * 0.114
+      const value = Math.max(0, Math.min(255, (gray - 128) * 1.55 + 128))
+      image.data[index] = value
+      image.data[index + 1] = value
+      image.data[index + 2] = value
+      image.data[index + 3] = 255
+    }
+    context.putImageData(image, 0, 0)
+    return canvas.toDataURL('image/png')
+  } finally {
+    bitmap.close()
+  }
+}
+
 function parseResult(
   items: OcrItem[],
   barcodes: string[],
@@ -283,6 +335,7 @@ function parseResult(
       /SER\.?(?:IAL)?\s*NO\.?\s*[:#-]?\s*(.*)$/i,
       /\bS\/N(?:\s*\(1S\))?\s*[:#-]?\s*(.*)$/i,
       /\bSN\s*[:#-]\s*(.*)$/i,
+      /(?:N[º°O]\s*DE\s*S[EÉ]RIE|N[ÚU]MERO\s*DE\s*S[EÉ]RIE)\s*[:#-]?\s*(.*)$/i,
     ],
   )
 
@@ -293,6 +346,7 @@ function parseResult(
       /PRODUCT\s*NAME\s*[:#-]?\s*(.*)$/i,
       /MACHINE\s*TYPE(?:\s*MODEL)?\s*[:#-]?\s*(.*)$/i,
       /TYPE\s*MODEL\s*[:#-]?\s*(.*)$/i,
+      /MODELO\s*[:#-]?\s*(.*)$/i,
     ],
   )
 
@@ -307,6 +361,28 @@ function parseResult(
       /\bMTM\s*[:#-]?\s*(.*)$/i,
     ],
   )
+
+  const processorSuggestion = patternSuggestion(cleaned, [
+    /^(?:PROC\.?|PROCESSADOR|PROCESSOR|CPU)\s*[:#-]?\s*(.+)$/i,
+    /\b((?:INTEL|AMD)\s+(?:CELERON|PENTIUM|CORE|RYZEN|XEON|ATHLON)[A-Z0-9 .-]*)$/i,
+  ], 'Processador detectado')
+  const memorySuggestion = patternSuggestion(cleaned, [
+    /^(?:MEM\.?|MEMORIA|MEMÓRIA|RAM)\s*[:#-]?\s*(.+)$/i,
+    /\b(\d{1,3}\s*GB\s*(?:DDR[345]\s*(?:\d{3,5}\s*MHZ)?)?)\b/i,
+  ], 'Memória detectada')
+  const storageSuggestion = patternSuggestion(cleaned, [
+    /\b((?:HD|HDD|SSD|NVME)\s*[:#-]?\s*\d+(?:[.,]\d+)?\s*(?:GB|TB)(?:\s+[A-Z0-9. -]+)?)$/i,
+  ], 'Armazenamento detectado')
+  const motherboardSuggestion = patternSuggestion(cleaned, [
+    /^(?:M\.B\.|MB|PLACA[- ]M[AÃ]E|MOTHERBOARD)\s*[:#-]?\s*(.+)$/i,
+  ], 'Placa-mãe detectada')
+  const operatingSystemSuggestion = patternSuggestion(cleaned, [
+    /\b((?:MS\s+)?WINDOWS\s+(?:10|11)(?:\s+(?:HOME|PRO|PROFESSIONAL|STANDARD))?)\b/i,
+    /\b(LINUX(?:\s+[A-Z0-9.-]+)?)\b/i,
+  ], 'Sistema operacional detectado')
+  const networkAdapterSuggestion = patternSuggestion(cleaned, [
+    /^(?:WIFI|WI-FI|WIRELESS|REDE)\s*[:#-]?\s*(.+)$/i,
+  ], 'Adaptador de rede detectado')
 
   let serviceSuggestion = serviceTag
     ? suggestion(
@@ -395,6 +471,12 @@ function parseResult(
         : undefined,
       electricalRating:
         electricalSuggestion(cleaned),
+      processor: processorSuggestion,
+      memory: memorySuggestion,
+      storage: storageSuggestion,
+      motherboard: motherboardSuggestion,
+      operatingSystem: operatingSystemSuggestion,
+      networkAdapter: networkAdapterSuggestion,
     },
     metrics: {
       totalMs: metrics?.totalMs,
@@ -529,8 +611,9 @@ export async function analyzeAssetLabel(
       'Preparando leitura OCR',
     )
 
+    const preparedImage = await prepareImageForOcr(file)
     const result = await worker.recognize(
-      file,
+      preparedImage,
       {
         rotateAuto: true,
       },

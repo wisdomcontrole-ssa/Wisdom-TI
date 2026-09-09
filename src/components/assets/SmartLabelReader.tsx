@@ -50,14 +50,15 @@ const confidenceClass: Record<
 }
 
 const REAR_CAMERA_STORAGE_KEY =
-  'wisdom-ti:rear-camera-device:v2'
+  'wisdom-ti:rear-camera-device:v3'
 
 const frontCameraPattern =
   /front|frontal|selfie|user|face|facing\s*front/i
 const rearCameraPattern =
   /back|rear|environment|traseir|traser|facing\s*back|world/i
 const secondaryRearPattern =
-  /wide|ultra|tele|macro|0\.5x|1x|2x|3x/i
+  /wide|ultra|tele|macro|depth|profund|0\.5x|2x|3x/i
+const mainRearPattern = /main|principal|standard|1x|camera\s*0/i
 
 function cameraScore(
   device: MediaDeviceInfo,
@@ -70,7 +71,10 @@ function cameraScore(
   }
 
   if (secondaryRearPattern.test(label)) {
-    score += 40
+    score -= 180
+  }
+  if (mainRearPattern.test(label)) {
+    score += 100
   }
 
   if (frontCameraPattern.test(label)) {
@@ -78,6 +82,56 @@ function cameraScore(
   }
 
   return score
+}
+
+type ExtendedCameraCapabilities = MediaTrackCapabilities & {
+  focusMode?: string[]
+  exposureMode?: string[]
+  whiteBalanceMode?: string[]
+}
+
+async function optimizeCameraTrack(track: MediaStreamTrack) {
+  const capabilities = track.getCapabilities() as ExtendedCameraCapabilities
+  const advanced: Record<string, unknown> = {}
+  if (capabilities.focusMode?.includes('continuous')) advanced.focusMode = 'continuous'
+  if (capabilities.exposureMode?.includes('continuous')) advanced.exposureMode = 'continuous'
+  if (capabilities.whiteBalanceMode?.includes('continuous')) advanced.whiteBalanceMode = 'continuous'
+  if (Object.keys(advanced).length > 0) {
+    try {
+      await track.applyConstraints({ advanced: [advanced] } as MediaTrackConstraints)
+    } catch {
+      // Controle anunciado, mas indisponível neste navegador.
+    }
+  }
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 850))
+}
+
+async function takeBestPhoto(video: HTMLVideoElement, stream: MediaStream) {
+  const track = stream.getVideoTracks()[0]
+  const ImageCaptureConstructor = (window as unknown as {
+    ImageCapture?: new (track: MediaStreamTrack) => { takePhoto: () => Promise<Blob> }
+  }).ImageCapture
+  if (track && ImageCaptureConstructor) {
+    try {
+      const photo = await new ImageCaptureConstructor(track).takePhoto()
+      if (photo.size > 0) return photo
+    } catch {
+      // Alternativa por canvas abaixo.
+    }
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = video.videoWidth
+  canvas.height = video.videoHeight
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Não foi possível preparar a captura da câmera.')
+  context.drawImage(video, 0, 0, canvas.width, canvas.height)
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (value) => value ? resolve(value) : reject(new Error('Não foi possível gerar a foto da etiqueta.')),
+      'image/jpeg',
+      0.96,
+    )
+  })
 }
 
 function streamLooksFront(
@@ -177,6 +231,12 @@ export function SmartLabelReader({
       serviceTag: '',
       productNumber: '',
       electricalRating: '',
+      processor: '',
+      memory: '',
+      storage: '',
+      motherboard: '',
+      operatingSystem: '',
+      networkAdapter: '',
     })
   const [processing, setProcessing] =
     useState(false)
@@ -253,8 +313,9 @@ export function SmartLabelReader({
       audio: false,
       video: {
         deviceId: { exact: deviceId },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
+        width: { ideal: 3840 },
+        height: { ideal: 2160 },
+        frameRate: { ideal: 30, max: 30 },
       },
     })
   }
@@ -389,8 +450,9 @@ export function SmartLabelReader({
             facingMode: {
               exact: 'environment',
             },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 3840 },
+            height: { ideal: 2160 },
+            frameRate: { ideal: 30, max: 30 },
           },
         })
 
@@ -443,6 +505,8 @@ export function SmartLabelReader({
     setCameraLabel(label)
     video.srcObject = stream
     await video.play()
+    const track = stream.getVideoTracks()[0]
+    if (track) await optimizeCameraTrack(track)
   }
 
   async function openRearCamera() {
@@ -581,50 +645,11 @@ export function SmartLabelReader({
       setCameraTaking(true)
       setCameraError(null)
 
-      const canvas =
-        document.createElement('canvas')
-
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-
-      const context =
-        canvas.getContext('2d')
-
-      if (!context) {
-        throw new Error(
-          'Não foi possível preparar a captura da câmera.',
-        )
-      }
-
-      context.drawImage(
-        video,
-        0,
-        0,
-        canvas.width,
-        canvas.height,
-      )
-
-      const blob =
-        await new Promise<Blob>(
-          (resolve, reject) => {
-            canvas.toBlob(
-              (value) => {
-                if (value) {
-                  resolve(value)
-                  return
-                }
-
-                reject(
-                  new Error(
-                    'Não foi possível gerar a foto da etiqueta.',
-                  ),
-                )
-              },
-              'image/jpeg',
-              0.94,
-            )
-          },
-        )
+      const activeStream = streamRef.current
+      if (!activeStream) throw new Error('A câmera foi desconectada antes da fotografia.')
+      const activeTrack = activeStream.getVideoTracks()[0]
+      if (activeTrack) await optimizeCameraTrack(activeTrack)
+      const blob = await takeBestPhoto(video, activeStream)
 
       const timestamp = new Date()
         .toISOString()
@@ -741,6 +766,12 @@ export function SmartLabelReader({
         electricalRating:
           result.fields.electricalRating
             ?.value ?? '',
+        processor: result.fields.processor?.value ?? '',
+        memory: result.fields.memory?.value ?? '',
+        storage: result.fields.storage?.value ?? '',
+        motherboard: result.fields.motherboard?.value ?? '',
+        operatingSystem: result.fields.operatingSystem?.value ?? '',
+        networkAdapter: result.fields.networkAdapter?.value ?? '',
       })
     } catch (error) {
       setErrorMessage(
@@ -793,7 +824,7 @@ export function SmartLabelReader({
           Usar imagem
           <input
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             className="hidden"
             disabled={disabled || processing}
             onChange={(event) => {
@@ -957,6 +988,23 @@ export function SmartLabelReader({
                 ?.confidence
             }
           />
+
+          {([
+            ['Processador', 'processor'],
+            ['Memória', 'memory'],
+            ['Armazenamento', 'storage'],
+            ['Placa-mãe', 'motherboard'],
+            ['Sistema operacional', 'operatingSystem'],
+            ['Rede / Wi-Fi', 'networkAdapter'],
+          ] as const).map(([label, field]) => (
+            <ReviewField
+              key={field}
+              label={label}
+              value={review[field]}
+              onChange={(value) => setReview((current) => ({ ...current, [field]: value }))}
+              confidence={analysis.fields[field]?.confidence}
+            />
+          ))}
 
           {analysis.barcodes.length > 0 && (
             <div className="rounded-xl bg-slate-50 p-3">

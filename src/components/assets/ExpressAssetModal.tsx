@@ -300,6 +300,36 @@ export function ExpressAssetModal({
     setElectricalRating(
       data.electricalRating,
     )
+    const specificationLines = [
+      data.processor && `Processador: ${data.processor}`,
+      data.memory && `Memória: ${data.memory}`,
+      data.storage && `Armazenamento: ${data.storage}`,
+      data.motherboard && `Placa-mãe: ${data.motherboard}`,
+      data.operatingSystem &&
+        `Sistema operacional: ${data.operatingSystem}`,
+      data.networkAdapter &&
+        `Rede/Wi-Fi: ${data.networkAdapter}`,
+    ].filter((value): value is string => Boolean(value))
+
+    if (specificationLines.length > 0) {
+      setNotes((current) => {
+        const withoutPreviousOcr = current
+          .replace(
+            /(?:\r?\n)?\[ESPECIFICAÇÕES OCR\][\s\S]*?\[\/ESPECIFICAÇÕES OCR\](?:\r?\n)?/g,
+            '\n',
+          )
+          .trim()
+        const ocrBlock = [
+          '[ESPECIFICAÇÕES OCR]',
+          ...specificationLines,
+          '[/ESPECIFICAÇÕES OCR]',
+        ].join('\n')
+
+        return [withoutPreviousOcr, ocrBlock]
+          .filter(Boolean)
+          .join('\n\n')
+      })
+    }
     setPhoto(file)
     setOcrSnapshot({
       file,
