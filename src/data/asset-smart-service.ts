@@ -13,7 +13,7 @@ import type {
 
 function client() {
   if (!supabase) {
-    throw new Error('Supabase não está configurado.')
+    throw new Error('Supabase nÃ£o estÃ¡ configurado.')
   }
 
   return supabase
@@ -173,14 +173,16 @@ export async function recordAssetLabelRead(input: {
   barcodes: string[]
   detectedData: Record<string, unknown>
   confidence: Record<string, unknown>
+  engine?: 'paddleocr' | 'tesseract'
+  engineVersion?: string
 }) {
   const { data, error } = await client().rpc(
     'record_asset_label_read',
     {
       p_asset_id: input.assetId,
       p_evidence_id: input.evidenceId ?? null,
-      p_engine: 'paddleocr',
-      p_engine_version: 'PP-OCRv5',
+      p_engine: input.engine ?? 'paddleocr',
+      p_engine_version: input.engineVersion ?? 'PP-OCRv5',
       p_raw_text: input.rawText,
       p_barcode_values: input.barcodes,
       p_detected_data: input.detectedData,

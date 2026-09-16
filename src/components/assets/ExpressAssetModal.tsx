@@ -23,6 +23,15 @@ import {
   setAssetSmartCore,
 } from '../../data/asset-smart-service'
 import {
+  recordOcrIntelligenceExtraction,
+  setAssetTechnicalProfile,
+} from '../../data/ocr-intelligence-service'
+import {
+  buildAssetPrefill,
+  type AssetPrefill,
+  type EquipmentCategory,
+} from '../../features/ocr-intelligence'
+import {
   uploadEvidence,
 } from '../../data/evidence-service'
 import {
@@ -72,9 +81,115 @@ function Field({
   )
 }
 
+function TechnicalValue({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  if (!value) return null
+
+  return (
+    <div className="rounded-xl border border-emerald-100 bg-white px-3 py-2">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </div>
+      <div className="mt-1 font-semibold text-slate-800">
+        {value}
+      </div>
+    </div>
+  )
+}
+
 interface OcrSnapshot {
   file: File
   analysis: AssetLabelAnalysis
+}
+
+const categoryAliases: Partial<
+  Record<EquipmentCategory, string[]>
+> = {
+  desktop: [
+    'desktop',
+    'computador',
+    'pc',
+    'workstation',
+  ],
+  notebook: [
+    'notebook',
+    'laptop',
+    'ultrabook',
+  ],
+  server: ['servidor', 'server'],
+  monitor: ['monitor', 'display'],
+  printer: ['impressora', 'printer'],
+  switch: ['switch'],
+  router: ['roteador', 'router'],
+  access_point: [
+    'access point',
+    'access_point',
+    'ap',
+  ],
+  firewall: ['firewall'],
+  ups: ['nobreak', 'ups'],
+  stabilizer: [
+    'estabilizador',
+    'stabilizer',
+  ],
+  power_strip: [
+    'filtro de linha',
+    'power strip',
+  ],
+  projector: ['projetor', 'projector'],
+  keyboard: ['teclado', 'keyboard'],
+  mouse: ['mouse'],
+  scanner: ['scanner'],
+  barcode_scanner: [
+    'leitor de codigo',
+    'barcode scanner',
+  ],
+  webcam: ['webcam'],
+  dock: ['dock', 'docking station'],
+  nas: ['nas'],
+}
+
+function normalizeTypeToken(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function findTypeIdForCategory(
+  category: EquipmentCategory,
+  types: AssetTypeRecord[],
+) {
+  const aliases =
+    categoryAliases[category] ?? []
+
+  if (aliases.length === 0) {
+    return undefined
+  }
+
+  const normalizedAliases =
+    aliases.map(normalizeTypeToken)
+
+  return types.find((type) => {
+    const code =
+      normalizeTypeToken(type.code)
+    const name =
+      normalizeTypeToken(type.name)
+
+    return normalizedAliases.some(
+      (alias) =>
+        code === alias ||
+        name === alias ||
+        name.includes(alias),
+    )
+  })?.id
 }
 
 export function ExpressAssetModal({
@@ -109,6 +224,8 @@ export function ExpressAssetModal({
     electricalRating,
     setElectricalRating,
   ] = useState('')
+  const [ocrPrefill, setOcrPrefill] =
+    useState<AssetPrefill | null>(null)
   const [origin, setOrigin] =
     useState<EntryOrigin>('purchase')
   const [unitId, setUnitId] =
@@ -203,6 +320,7 @@ export function ExpressAssetModal({
       setProductNumber('')
       setServiceTag('')
       setElectricalRating('')
+      setOcrPrefill(null)
       setOrigin('purchase')
       setUnitId('')
       setEnvironmentId('')
@@ -262,7 +380,7 @@ export function ExpressAssetModal({
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : 'Não foi possível preparar o cadastro.',
+            : 'NÃ£o foi possÃ­vel preparar o cadastro.',
         )
       } finally {
         if (active) {
@@ -292,44 +410,110 @@ export function ExpressAssetModal({
     file: File,
     analysis: AssetLabelAnalysis,
   ) {
-    setManufacturer(data.manufacturer)
-    setModel(data.model)
-    setSerial(data.serialNumber)
+    const intelligenceInput = [
+      data.processor &&
+        'Processador: ' +
+          data.processor,
+      data.memory &&
+        'Memória: ' +
+          data.memory,
+      data.storage &&
+        'Armazenamento: ' +
+          data.storage,
+      data.motherboard &&
+        'Placa-mãe: ' +
+          data.motherboard,
+      data.operatingSystem &&
+        'Sistema operacional: ' +
+          data.operatingSystem,
+      data.networkAdapter &&
+        'Rede/Wi-Fi: ' +
+          data.networkAdapter,
+      analysis.rawText,
+    ]
+      .filter(
+        (value): value is string =>
+          Boolean(value),
+      )
+      .join('\n')
+
+    const prefill =
+      buildAssetPrefill(
+        intelligenceInput,
+      )
+
+    setOcrPrefill(prefill)
+
+    setManufacturer(
+      data.manufacturer ||
+        prefill.manufacturer ||
+        '',
+    )
+    setModel(
+      data.model ||
+        prefill.model ||
+        '',
+    )
+    setSerial(
+      data.serialNumber ||
+        prefill.serialNumber ||
+        '',
+    )
     setServiceTag(data.serviceTag)
-    setProductNumber(data.productNumber)
+    setProductNumber(
+      data.productNumber ||
+        prefill.partNumber ||
+        prefill.sku ||
+        '',
+    )
     setElectricalRating(
       data.electricalRating,
     )
-    const specificationLines = [
-      data.processor && `Processador: ${data.processor}`,
-      data.memory && `Memória: ${data.memory}`,
-      data.storage && `Armazenamento: ${data.storage}`,
-      data.motherboard && `Placa-mãe: ${data.motherboard}`,
-      data.operatingSystem &&
-        `Sistema operacional: ${data.operatingSystem}`,
-      data.networkAdapter &&
-        `Rede/Wi-Fi: ${data.networkAdapter}`,
-    ].filter((value): value is string => Boolean(value))
 
-    if (specificationLines.length > 0) {
-      setNotes((current) => {
-        const withoutPreviousOcr = current
+    const inferredTypeId =
+      findTypeIdForCategory(
+        prefill.type ?? 'unknown',
+        types,
+      )
+
+    if (inferredTypeId) {
+      setTypeId(inferredTypeId)
+    }
+
+    setNotes((current) => {
+      const withoutOldOcr =
+        current
           .replace(
             /(?:\r?\n)?\[ESPECIFICAÇÕES OCR\][\s\S]*?\[\/ESPECIFICAÇÕES OCR\](?:\r?\n)?/g,
             '\n',
           )
+          .replace(
+            /(?:\r?\n)?\[OCR NÃO CLASSIFICADO\][\s\S]*?\[\/OCR NÃO CLASSIFICADO\](?:\r?\n)?/g,
+            '\n',
+          )
           .trim()
-        const ocrBlock = [
-          '[ESPECIFICAÇÕES OCR]',
-          ...specificationLines,
-          '[/ESPECIFICAÇÕES OCR]',
-        ].join('\n')
 
-        return [withoutPreviousOcr, ocrBlock]
-          .filter(Boolean)
-          .join('\n\n')
-      })
-    }
+      const remaining =
+        prefill.observations?.trim()
+
+      if (!remaining) {
+        return withoutOldOcr
+      }
+
+      const block = [
+        '[OCR NÃO CLASSIFICADO]',
+        remaining,
+        '[/OCR NÃO CLASSIFICADO]',
+      ].join('\n')
+
+      return [
+        withoutOldOcr,
+        block,
+      ]
+        .filter(Boolean)
+        .join('\n\n')
+    })
+
     setPhoto(file)
     setOcrSnapshot({
       file,
@@ -354,7 +538,7 @@ export function ExpressAssetModal({
       !organizationName.trim()
     ) {
       setErrorMessage(
-        'Informe a instituição responsável pelo equipamento cedido, emprestado ou de terceiro.',
+        'Informe a instituiÃ§Ã£o responsÃ¡vel pelo equipamento cedido, emprestado ou de terceiro.',
       )
       return
     }
@@ -364,7 +548,7 @@ export function ExpressAssetModal({
       !organizationName.trim()
     ) {
       setErrorMessage(
-        'Informe a instituição vinculada ao identificador externo.',
+        'Informe a instituiÃ§Ã£o vinculada ao identificador externo.',
       )
       return
     }
@@ -407,8 +591,8 @@ export function ExpressAssetModal({
         } catch (error) {
           warnings.push(
             error instanceof Error
-              ? `Instituição: ${error.message}`
-              : 'Não foi possível registrar a instituição.',
+              ? `InstituiÃ§Ã£o: ${error.message}`
+              : 'NÃ£o foi possÃ­vel registrar a instituiÃ§Ã£o.',
           )
         }
       }
@@ -429,10 +613,78 @@ export function ExpressAssetModal({
         warnings.push(
           error instanceof Error
             ? `Dados complementares: ${error.message}`
-            : 'Dados complementares não foram salvos.',
+            : 'Dados complementares nÃ£o foram salvos.',
         )
       }
 
+      if (ocrPrefill) {
+        try {
+          await setAssetTechnicalProfile({
+            assetId: asset.id,
+            processorManufacturer:
+              ocrPrefill.processor
+                ?.manufacturer,
+            processorModel:
+              ocrPrefill.processor?.model,
+            memoryTotalGb:
+              ocrPrefill.memory?.totalGb,
+            memoryType:
+              ocrPrefill.memory?.type,
+            memorySpeedMhz:
+              ocrPrefill.memory
+                ?.speedMhz,
+            storageCapacityGb:
+              ocrPrefill.storage
+                ?.capacityGb,
+            storageType:
+              ocrPrefill.storage?.type,
+            storageInterface:
+              ocrPrefill.storage
+                ?.interface,
+            storageFormFactor:
+              ocrPrefill.storage
+                ?.formFactor,
+            motherboardManufacturer:
+              ocrPrefill.motherboard
+                ?.manufacturer,
+            motherboardModel:
+              ocrPrefill.motherboard
+                ?.model,
+            operatingSystem:
+              ocrPrefill.operatingSystem,
+            wifiManufacturer:
+              ocrPrefill.wifi
+                ?.manufacturer,
+            wifiModel:
+              ocrPrefill.wifi?.model,
+            macAddress:
+              ocrPrefill.macAddress,
+            source: 'ocr',
+          })
+        } catch (error) {
+          warnings.push(
+            error instanceof Error
+              ? 'Perfil técnico: ' +
+                  error.message
+              : 'Perfil técnico não foi salvo.',
+          )
+        }
+
+        try {
+          await recordOcrIntelligenceExtraction({
+            assetId: asset.id,
+            extraction:
+              ocrPrefill.extraction,
+          })
+        } catch (error) {
+          warnings.push(
+            error instanceof Error
+              ? 'Rastreabilidade OCR: ' +
+                  error.message
+              : 'Rastreabilidade OCR não foi salva.',
+          )
+        }
+      }
       if (
         organizationId &&
         externalIdentifierValue.trim()
@@ -450,7 +702,7 @@ export function ExpressAssetModal({
           warnings.push(
             error instanceof Error
               ? `Identificador externo: ${error.message}`
-              : 'Identificador externo não foi salvo.',
+              : 'Identificador externo nÃ£o foi salvo.',
           )
         }
       }
@@ -480,7 +732,7 @@ export function ExpressAssetModal({
               captureMethod: 'camera',
               caption: ocrSnapshot
                 ? 'Etiqueta original analisada pelo OCR'
-                : 'Foto do pré-cadastro Express',
+                : 'Foto do prÃ©-cadastro Express',
             })
 
           labelEvidenceId =
@@ -489,7 +741,7 @@ export function ExpressAssetModal({
           warnings.push(
             error instanceof Error
               ? `Foto da etiqueta: ${error.message}`
-              : 'Foto da etiqueta não foi enviada.',
+              : 'Foto da etiqueta nÃ£o foi enviada.',
           )
         }
       }
@@ -520,6 +772,11 @@ export function ExpressAssetModal({
             assetId: asset.id,
             evidenceId:
               labelEvidenceId,
+            engine:
+              ocrSnapshot.analysis.engine,
+            engineVersion:
+              ocrSnapshot.analysis
+                .engineVersion,
             rawText:
               ocrSnapshot.analysis
                 .rawText,
@@ -534,8 +791,8 @@ export function ExpressAssetModal({
         } catch (error) {
           warnings.push(
             error instanceof Error
-              ? `Histórico OCR: ${error.message}`
-              : 'Histórico OCR não foi registrado.',
+              ? `HistÃ³rico OCR: ${error.message}`
+              : 'HistÃ³rico OCR nÃ£o foi registrado.',
           )
         }
       }
@@ -570,7 +827,7 @@ export function ExpressAssetModal({
             warnings.push(
               error instanceof Error
                 ? `Arquivo da nota fiscal: ${error.message}`
-                : 'Arquivo da nota fiscal não foi enviado.',
+                : 'Arquivo da nota fiscal nÃ£o foi enviado.',
             )
           }
         }
@@ -595,7 +852,7 @@ export function ExpressAssetModal({
           warnings.push(
             error instanceof Error
               ? `Nota fiscal: ${error.message}`
-              : 'Nota fiscal não foi vinculada.',
+              : 'Nota fiscal nÃ£o foi vinculada.',
           )
         }
       }
@@ -610,7 +867,7 @@ export function ExpressAssetModal({
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'Não foi possível criar o pré-cadastro.',
+          : 'NÃ£o foi possÃ­vel criar o prÃ©-cadastro.',
       )
     } finally {
       setSaving(false)
@@ -621,7 +878,7 @@ export function ExpressAssetModal({
     <FormModal
       open={open}
       title="Novo ativo Express"
-      description="Pré-cadastro rápido com leitura inteligente de etiqueta, rastreio fiscal e posse institucional."
+      description="PrÃ©-cadastro rÃ¡pido com leitura inteligente de etiqueta, rastreio fiscal e posse institucional."
       onClose={onClose}
       widthClassName="max-w-3xl"
       footer={
@@ -648,7 +905,7 @@ export function ExpressAssetModal({
             <PackagePlus size={16} />
             {saving
               ? 'Cadastrando...'
-              : 'Criar pré-cadastro'}
+              : 'Criar prÃ©-cadastro'}
           </button>
         </div>
       }
@@ -709,13 +966,13 @@ export function ExpressAssetModal({
                 Compra
               </option>
               <option value="donation">
-                Doação
+                DoaÃ§Ã£o
               </option>
               <option value="used">
                 Equipamento usado
               </option>
               <option value="transfer">
-                Transferência
+                TransferÃªncia
               </option>
               <option value="other">
                 Outra origem
@@ -749,7 +1006,7 @@ export function ExpressAssetModal({
             />
           </Field>
 
-          <Field label="Número de série">
+          <Field label="NÃºmero de sÃ©rie">
             <input
               className={inputClass}
               value={serial}
@@ -787,7 +1044,7 @@ export function ExpressAssetModal({
             />
           </Field>
 
-          <Field label="Alimentação / tensão">
+          <Field label="AlimentaÃ§Ã£o / tensÃ£o">
             <input
               className={inputClass}
               value={
@@ -798,10 +1055,120 @@ export function ExpressAssetModal({
                   event.target.value,
                 )
               }
-              placeholder="Ex.: 100-240V · 50/60Hz"
+              placeholder="Ex.: 100-240V Â· 50/60Hz"
             />
           </Field>
         </div>
+
+        {ocrPrefill && (
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
+            <div className="text-xs font-black uppercase tracking-[0.08em] text-emerald-700">
+              Dados técnicos identificados
+            </div>
+
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <TechnicalValue
+                label="Processador"
+                value={[
+                  ocrPrefill.processor
+                    ?.manufacturer,
+                  ocrPrefill.processor?.model,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              />
+              <TechnicalValue
+                label="Memória"
+                value={[
+                  ocrPrefill.memory
+                    ?.totalGb !== undefined
+                    ? String(
+                        ocrPrefill.memory
+                          .totalGb,
+                      ) + ' GB'
+                    : '',
+                  ocrPrefill.memory?.type,
+                  ocrPrefill.memory
+                    ?.speedMhz !== undefined
+                    ? String(
+                        ocrPrefill.memory
+                          .speedMhz,
+                      ) + ' MHz'
+                    : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              />
+              <TechnicalValue
+                label="Armazenamento"
+                value={[
+                  ocrPrefill.storage
+                    ?.type,
+                  ocrPrefill.storage
+                    ?.capacityGb !==
+                  undefined
+                    ? String(
+                        ocrPrefill.storage
+                          .capacityGb,
+                      ) + ' GB'
+                    : '',
+                  ocrPrefill.storage
+                    ?.interface,
+                  ocrPrefill.storage
+                    ?.formFactor,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              />
+              <TechnicalValue
+                label="Placa-mãe"
+                value={[
+                  ocrPrefill.motherboard
+                    ?.manufacturer,
+                  ocrPrefill.motherboard
+                    ?.model,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              />
+              <TechnicalValue
+                label="Sistema operacional"
+                value={
+                  ocrPrefill.operatingSystem ||
+                  ''
+                }
+              />
+              <TechnicalValue
+                label="Wi-Fi"
+                value={[
+                  ocrPrefill.wifi
+                    ?.manufacturer,
+                  ocrPrefill.wifi?.model,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              />
+              <TechnicalValue
+                label="MAC"
+                value={
+                  ocrPrefill.macAddress ||
+                  ''
+                }
+              />
+              <TechnicalValue
+                label="Confiança"
+                value={
+                  String(
+                    Math.round(
+                      ocrPrefill.extraction
+                        .confidence * 100,
+                    ),
+                  ) + '%'
+                }
+              />
+            </div>
+          </section>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Unidade inicial">
@@ -863,14 +1230,14 @@ export function ExpressAssetModal({
           </Field>
         </div>
 
-        <Field label="Observação rápida">
+        <Field label="ObservaÃ§Ã£o rÃ¡pida">
           <textarea
             className={textareaClass}
             value={notes}
             onChange={(event) =>
               setNotes(event.target.value)
             }
-            placeholder="Ex.: recebido na portaria, NF pendente, doação..."
+            placeholder="Ex.: recebido na portaria, NF pendente, doaÃ§Ã£o..."
           />
         </Field>
 
@@ -916,10 +1283,10 @@ export function ExpressAssetModal({
         >
           <div>
             <div className="text-sm font-black text-slate-900">
-              Aquisição, garantia e instituição
+              AquisiÃ§Ã£o, garantia e instituiÃ§Ã£o
             </div>
             <div className="mt-1 text-xs text-slate-500">
-              Nota fiscal, equipamento cedido/emprestado e identificação de outro órgão.
+              Nota fiscal, equipamento cedido/emprestado e identificaÃ§Ã£o de outro Ã³rgÃ£o.
             </div>
           </div>
           <ChevronDown
@@ -935,7 +1302,7 @@ export function ExpressAssetModal({
         {advancedOpen && (
           <div className="space-y-5 rounded-2xl border border-slate-200 p-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Data de aquisição">
+              <Field label="Data de aquisiÃ§Ã£o">
                 <input
                   type="date"
                   className={inputClass}
@@ -949,7 +1316,7 @@ export function ExpressAssetModal({
                 />
               </Field>
 
-              <Field label="Garantia até">
+              <Field label="Garantia atÃ©">
                 <input
                   type="date"
                   className={inputClass}
@@ -968,11 +1335,11 @@ export function ExpressAssetModal({
 
             <div className="border-t border-slate-100 pt-4">
               <div className="text-xs font-black uppercase tracking-[0.08em] text-slate-400">
-                Posse / custódia
+                Posse / custÃ³dia
               </div>
 
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                <Field label="Situação">
+                <Field label="SituaÃ§Ã£o">
                   <select
                     className={inputClass}
                     value={
@@ -986,13 +1353,13 @@ export function ExpressAssetModal({
                     }
                   >
                     <option value="own">
-                      Próprio
+                      PrÃ³prio
                     </option>
                     <option value="ceded">
-                      Cedido para nós
+                      Cedido para nÃ³s
                     </option>
                     <option value="loaned">
-                      Emprestado para nós
+                      Emprestado para nÃ³s
                     </option>
                     <option value="commodatum">
                       Comodato
@@ -1009,7 +1376,7 @@ export function ExpressAssetModal({
                   </select>
                 </Field>
 
-                <Field label="Instituição">
+                <Field label="InstituiÃ§Ã£o">
                   <input
                     className={inputClass}
                     value={
@@ -1021,7 +1388,7 @@ export function ExpressAssetModal({
                           .value,
                       )
                     }
-                    placeholder="Nome do órgão/instituição"
+                    placeholder="Nome do Ã³rgÃ£o/instituiÃ§Ã£o"
                   />
                 </Field>
 
@@ -1086,7 +1453,7 @@ export function ExpressAssetModal({
                     }
                   >
                     <option value="patrimony">
-                      Patrimônio
+                      PatrimÃ´nio
                     </option>
                     <option value="tombamento">
                       Tombamento
@@ -1104,7 +1471,7 @@ export function ExpressAssetModal({
                 </Field>
 
                 <div className="sm:col-span-2">
-                  <Field label="Código / patrimônio da outra instituição">
+                  <Field label="CÃ³digo / patrimÃ´nio da outra instituiÃ§Ã£o">
                     <input
                       className={inputClass}
                       value={
@@ -1116,7 +1483,7 @@ export function ExpressAssetModal({
                             .value,
                         )
                       }
-                      placeholder="Este código também localizará o ativo"
+                      placeholder="Este cÃ³digo tambÃ©m localizarÃ¡ o ativo"
                     />
                   </Field>
                 </div>
@@ -1135,7 +1502,7 @@ export function ExpressAssetModal({
               </div>
 
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                <Field label="Número">
+                <Field label="NÃºmero">
                   <input
                     className={inputClass}
                     value={
@@ -1150,7 +1517,7 @@ export function ExpressAssetModal({
                   />
                 </Field>
 
-                <Field label="Série">
+                <Field label="SÃ©rie">
                   <input
                     className={inputClass}
                     value={
@@ -1165,7 +1532,7 @@ export function ExpressAssetModal({
                   />
                 </Field>
 
-                <Field label="Data de emissão">
+                <Field label="Data de emissÃ£o">
                   <input
                     type="date"
                     className={inputClass}
