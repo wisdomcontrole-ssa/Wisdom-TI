@@ -826,3 +826,111 @@ Validacoes obrigatorias desta etapa:
 - `index.html` recebeu uma revisao de deploy para alterar o precache e forcar geracao de novo service worker no build.
 - Camera, Tesseract e motor OCR permaneceram sem alteracao.
 - Validacao pendente: deploy Cloudflare e nova abertura do app para ativacao do service worker atualizado.
+
+## M15 - Central de chamados, triagem e recebimento técnico - 2026-09-16
+
+Estado local preparado; banco ainda deve ser validado nos dois projetos Supabase antes da publicação.
+
+Arquitetura:
+- portal público mobile-first em `/suporte`, sem necessidade de login;
+- protocolo próprio `CHM-ANO-000000`;
+- chamado separado da ordem técnica `MAN-ANO-000000`;
+- equipamento pode abrir chamado mesmo sem patrimônio cadastrado;
+- identificação informada é cruzada de forma exata com código Wisdom, serial, service tag, product number e identificadores externos;
+- questionário adaptativo curto por categoria do problema;
+- checklist de verificações simples e seguras antes do envio;
+- resumo técnico preliminar determinístico, sem API de IA;
+- biblioteca da triagem versionada em `maintenance_triage_catalog`;
+- snapshot da versão da triagem preservado em cada chamado;
+- fila interna em `/manutencoes/chamados`;
+- técnico registra recebimento, vincula patrimônio existente ou abre o cadastro Express;
+- somente depois do recebimento e do vínculo com patrimônio o chamado pode virar ordem de manutenção;
+- `maintenance_orders.asset_id` continua obrigatório;
+- histórico do chamado preservado em `maintenance_request_events`;
+- novas permissões backend: `maintenance.requests.view` e `maintenance.requests.manage`;
+- RLS mantém as tabelas internas fora do acesso público;
+- submissão pública ocorre apenas pela RPC `create_public_maintenance_request`, com validação, honeypot, tempo mínimo de preenchimento e bloqueio básico de duplicidade recente;
+- câmera, Tesseract e motor OCR não fazem parte desta etapa e permanecem protegidos.
+
+Novos arquivos:
+- `src/features/maintenance-triage.ts`;
+- `src/data/maintenance-request-service.ts`;
+- `src/pages/PublicSupportPage.tsx`;
+- `src/pages/MaintenanceRequestsPage.tsx`;
+- `scripts/test-maintenance-triage.ts`;
+- `supabase/migrations/20260916131500_m15_maintenance_requests_triage.sql`.
+
+Arquivos atualizados:
+- `src/App.tsx`;
+- `src/pages/MaintenancePage.tsx`.
+
+Validação obrigatória:
+1. executar `scripts/test-maintenance-triage.ts`;
+2. executar `npm run build`;
+3. executar a migration M15 nos dois Supabase;
+4. publicar primeiro a Instância 1;
+5. testar pelo celular `/suporte`;
+6. testar fluxo chamado -> recebimento -> patrimônio -> ordem de manutenção;
+7. após aprovação, avançar para transferência atômica de componentes entre estoque e patrimônios.
+
+## M16A - Wisdom Endpoint Management - 2026-09-16
+
+Estado local preparado; banco ainda deve ser validado nos dois projetos Supabase antes da publicação.
+
+Objetivo desta subetapa:
+- eliminar a cópia manual do token longo do agente;
+- transformar a ficha do patrimônio em ponto de instalação, diagnóstico e manutenção remota;
+- ampliar o inventário para componentes físicos e sinais de saúde do Windows;
+- manter a execução remota restrita a um catálogo fechado e auditável.
+
+Arquitetura implementada:
+- código de ativação temporário `WT-XXXX-XXXX-XXXX`, uso único, validade de 20 minutos e armazenado somente como hash;
+- o token permanente `wti_...` continua forte, mas é trocado automaticamente entre instalador e backend e não precisa ser digitado pelo técnico;
+- instalador e agente passam a ser o mesmo executável `WisdomTI-Agent-Setup.exe`;
+- ao baixar pela ficha do ativo, o navegador renomeia o executável incluindo o código de ativação;
+- o executável lê o código no próprio nome, faz o enrollment, copia-se para ProgramData e cria tarefas SYSTEM;
+- polling de endpoint a cada 1 minuto; inventário completo a cada 15 minutos;
+- heartbeat passa a ser atualizado pelo polling, independentemente do inventário completo;
+- inventário profundo: placa-mãe, módulos individuais de RAM, discos físicos, saúde do disco, interfaces, adaptadores de rede e eventos de diagnóstico do Windows;
+- telemetria de saúde: reinicializações inesperadas, BugCheck, WHEA, resultados de diagnóstico de memória, falhas de aplicativos, espaço livre e reinício pendente;
+- snapshots do agente complementam apenas campos vazios do patrimônio/perfil técnico; dados humanos/OCR existentes não são sobrescritos automaticamente;
+- alertas de saúde para reinicializações recorrentes, BugCheck, WHEA, falha de memória, pouco espaço e disco físico com saúde anormal;
+- fila `agent_commands` auditada e vinculável a ordem de manutenção;
+- catálogo remoto inicial: inventário, diagnóstico, SFC verify/scan, DISM scan/restore, flush DNS, limpeza segura de temporários e Optimize-Volume;
+- nenhum PowerShell arbitrário pode ser enviado pelo navegador;
+- nenhuma operação de formatação, remoção arbitrária de software ou acesso remoto de desktop foi incluída nesta subetapa;
+- acesso remoto visual via motor self-hosted fica para M16B, após definição do servidor de relay.
+
+Arquivos principais M16A:
+- `agent/WisdomTI.Agent/Program.cs`;
+- `agent/WisdomTI.Agent/Models.cs`;
+- `agent/WisdomTI.Agent/AgentBackendClient.cs`;
+- `agent/WisdomTI.Agent/AgentInstaller.cs`;
+- `agent/WisdomTI.Agent/InventoryCollector.cs`;
+- `agent/WisdomTI.Agent/RemoteCommandExecutor.cs`;
+- `agent/WisdomTI.Agent/NativeUi.cs`;
+- `agent/scripts/BUILD_AGENT_PACKAGE_V2.ps1`;
+- `src/components/agents/AssetAgentPanel.tsx`;
+- `src/data/agent-service.ts`;
+- `src/types/agent.ts`;
+- `supabase/migrations/20260916143000_m16a_endpoint_management.sql`.
+
+Segurança:
+- credencial permanente longa continua sendo a autenticação do endpoint;
+- ativação curta é temporária, de uso único e usa 48 bits aleatórios;
+- transferência somente por HTTPS;
+- configuração local protegida por ACL para SYSTEM e Administradores;
+- ações remotas exigem permissão backend, motivo e ficam em auditoria;
+- agente aceita apenas comandos pré-definidos;
+- MachineGuid impede reutilização silenciosa da credencial em outra máquina;
+- uma trava global impede execuções concorrentes do agente na mesma máquina.
+
+Pendências para validação:
+1. `dotnet publish` do executável único;
+2. confirmar que o binário fica abaixo do limite de 25 MiB do Cloudflare Pages;
+3. teste TypeScript M16A;
+4. `npm run build`;
+5. executar SQL M16A nos dois Supabase;
+6. somente depois publicar M15 + M16A na Instância 1;
+7. instalar em uma máquina piloto e validar enrollment, heartbeat, inventário e uma ação de diagnóstico;
+8. M16B: acesso remoto visual self-hosted e administração de software com regras específicas.

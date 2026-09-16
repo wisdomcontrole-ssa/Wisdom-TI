@@ -1,40 +1,138 @@
 using System.Diagnostics;
-using System.Net.Http.Json;
-using System.Text;
+using System.Security.Principal;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
+using Microsoft.Win32;
 
 namespace WisdomTI.Agent;
 
 internal static class Program
 {
-    private const string AgentVersion = "1.0.0";
-    private const string ProtocolVersion = "1";
+    internal const string AgentVersion = "2.0.0";
+    internal const string ProtocolVersion = "1";
 
+    private static readonly Regex ActivationPattern = new(
+        @"WT-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    [STAThread]
     private static async Task<int> Main(string[] args)
     {
-        var configPath = GetConfigPath(args);
-        var log = new AgentLog();
+        var paths = AgentPaths.Create();
+        var log = new AgentLog(paths.LogPath);
 
         try
         {
-            log.Write("Agent start.");
-
-            if (!File.Exists(configPath))
+            if (HasArg(args, "--scheduled") ||
+                HasArg(args, "--once") ||
+                IsInstalledExecutable(paths))
             {
-                throw new InvalidOperationException(
-                    $"Config not found: {configPath}");
+                using var mutex =
+                    new Mutex(
+                        initiallyOwned: true,
+                        name:
+                            @"Global\WisdomTI.Agent.Endpoint",
+                        createdNew:
+                            out var ownsMutex);
+
+                if (!ownsMutex)
+                {
+                    log.Write(
+                        "Outra execução do agente já está ativa.");
+                    return 0;
+                }
+
+                try
+                {
+                    return await RunAgentCycleAsync(
+                        paths,
+                        log);
+                }
+                finally
+                {
+                    mutex.ReleaseMutex();
+                }
             }
 
-            var configJson = await File.ReadAllTextAsync(configPath);
-            var config = JsonSerializer.Deserialize<AgentConfig>(
-                configJson,
-                JsonOptions.Default)
-                ?? throw new InvalidOperationException("Invalid agent config.");
+            var activationCode =
+                GetArgValue(args, "--activate") ??
+                ReadActivationFromExecutableName();
 
-            ValidateConfig(config);
+            if (string.IsNullOrWhiteSpace(activationCode))
+            {
+                NativeUi.Show(
+                    "Wisdom TI Agent",
+                    "Este instalador não possui um código de ativação.\n\n" +
+                    "Baixe o instalador diretamente pela ficha do patrimônio no Wisdom TI.");
+                return 2;
+            }
 
-            var inventory = await InventoryCollector.CollectAsync(log);
+            if (!IsAdministrator())
+            {
+                NativeUi.Show(
+                    "Wisdom TI Agent",
+                    "A instalação precisa ser executada como administrador.");
+                return 3;
+            }
+
+            return await AgentInstaller.InstallAsync(
+                activationCode,
+                paths,
+                log);
+        }
+        catch (Exception ex)
+        {
+            log.Write($"FATAL: {ex}");
+
+            if (!HasArg(args, "--scheduled"))
+            {
+                NativeUi.Show(
+                    "Wisdom TI Agent",
+                    "Não foi possível concluir a operação.\n\n" +
+                    ex.Message);
+            }
+
+            return 1;
+        }
+    }
+
+    private static async Task<int> RunAgentCycleAsync(
+        AgentPaths paths,
+        AgentLog log)
+    {
+        if (!File.Exists(paths.ConfigPath))
+        {
+            log.Write("Configuração não encontrada.");
+            return 4;
+        }
+
+        var config = JsonSerializer.Deserialize(
+            await File.ReadAllTextAsync(paths.ConfigPath),
+            AgentJsonContext.Default.AgentConfig)
+            ?? throw new InvalidOperationException(
+                "Configuração do agente inválida.");
+
+        ValidateConfig(config);
+
+        var backend = new AgentBackendClient(config, log);
+
+        RemoteCommand? command = null;
+
+        try
+        {
+            command = await backend.PollCommandAsync();
+        }
+        catch (Exception ex)
+        {
+            log.Write($"Falha ao consultar comandos: {ex.Message}");
+        }
+
+        var state = await AgentStateStore.LoadAsync(paths.StatePath);
+
+        async Task<InventoryUploadResult> CollectAndUploadAsync()
+        {
+            var inventory =
+                await InventoryCollector.CollectAsync(log);
 
             var payload = new AgentPayload
             {
@@ -46,271 +144,284 @@ internal static class Program
                 Hardware = inventory.Hardware,
                 Disks = inventory.Disks,
                 Software = inventory.Software,
-                Health = new Dictionary<string, object?>
-                {
-                    ["collector"] = "powershell-cim",
-                    ["software_count"] = inventory.Software.Count,
-                    ["disk_count"] = inventory.Disks.Count,
-                },
+                Health = inventory.Health,
             };
 
-            using var client = new HttpClient
+            await backend.UploadInventoryAsync(payload);
+
+            state.LastInventoryAt =
+                DateTimeOffset.UtcNow;
+            await AgentStateStore.SaveAsync(
+                paths.StatePath,
+                state);
+
+            return new InventoryUploadResult
             {
-                Timeout = TimeSpan.FromSeconds(60),
+                SoftwareCount =
+                    inventory.Software.Count,
+                LogicalDiskCount =
+                    inventory.Disks.Count,
             };
+        }
 
-            client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                $"WisdomTI-Agent/{AgentVersion}");
-            client.DefaultRequestHeaders.Add(
-                "x-wisdom-agent-token",
-                config.AgentToken);
+        if (command is not null)
+        {
+            log.Write(
+                $"Executando comando {command.Id}: {command.CommandType}");
 
-            var endpoint =
-                $"{config.ProjectUrl.TrimEnd('/')}/functions/v1/agent-ingest";
+            CommandExecutionResult result;
 
-            using var response = await client.PostAsJsonAsync(
-                endpoint,
-                payload,
-                JsonOptions.Default);
+            try
+            {
+                result =
+                    await RemoteCommandExecutor.ExecuteAsync(
+                        command,
+                        CollectAndUploadAsync,
+                        log);
+            }
+            catch (Exception ex)
+            {
+                result = new CommandExecutionResult
+                {
+                    Success = false,
+                    ExitCode = -1,
+                    Summary =
+                        "A ação remota falhou.",
+                    Output = Limit(ex.ToString(), 12000),
+                    DurationMs = 0,
+                };
+            }
 
-            var responseText = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
+            try
+            {
+                await backend.CompleteCommandAsync(
+                    command.Id,
+                    result);
+            }
+            catch (Exception ex)
             {
                 log.Write(
-                    $"Upload failed HTTP {(int)response.StatusCode}: {Limit(responseText, 1200)}");
-                return 2;
+                    $"Falha ao concluir comando no servidor: {ex.Message}");
             }
-
-            log.Write($"Upload OK: {Limit(responseText, 1000)}");
-            return 0;
         }
-        catch (Exception ex)
-        {
-            log.Write($"ERROR: {ex}");
-            return 1;
-        }
-    }
 
-    private static string GetConfigPath(string[] args)
-    {
-        for (var i = 0; i < args.Length - 1; i++)
+        var inventoryDue =
+            state.LastInventoryAt is null ||
+            DateTimeOffset.UtcNow -
+                state.LastInventoryAt.Value >=
+                TimeSpan.FromMinutes(15);
+
+        if (inventoryDue &&
+            command?.CommandType is not
+                ("collect_inventory" or
+                 "collect_diagnostics"))
         {
-            if (string.Equals(
-                args[i],
-                "--config",
-                StringComparison.OrdinalIgnoreCase))
+            try
             {
-                return args[i + 1];
+                await CollectAndUploadAsync();
+            }
+            catch (Exception ex)
+            {
+                log.Write(
+                    $"Falha na coleta periódica: {ex}");
+                return 5;
             }
         }
 
-        var root = Environment.GetFolderPath(
-            Environment.SpecialFolder.CommonApplicationData);
-
-        return Path.Combine(
-            root,
-            "WisdomTI",
-            "Agent",
-            "agent.json");
+        return 0;
     }
 
-    private static void ValidateConfig(AgentConfig config)
+    private static void ValidateConfig(
+        AgentConfig config)
     {
         if (!Uri.TryCreate(
-            config.ProjectUrl,
-            UriKind.Absolute,
-            out var uri) ||
-            uri.Scheme != Uri.UriSchemeHttps)
+                config.ProjectUrl,
+                UriKind.Absolute,
+                out var projectUri) ||
+            projectUri.Scheme !=
+                Uri.UriSchemeHttps)
         {
             throw new InvalidOperationException(
-                "ProjectUrl must use HTTPS.");
+                "URL do projeto inválida.");
         }
 
-        if (string.IsNullOrWhiteSpace(config.AgentToken) ||
+        if (string.IsNullOrWhiteSpace(
+                config.PublishableKey))
+        {
+            throw new InvalidOperationException(
+                "Chave publicável ausente.");
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                config.AgentToken) ||
             !config.AgentToken.StartsWith(
                 "wti_",
                 StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                "Agent token invalid.");
+                "Credencial do agente inválida.");
         }
     }
 
-    private static string Limit(string text, int max)
-        => text.Length <= max ? text : text[..max];
+    private static bool IsInstalledExecutable(
+        AgentPaths paths)
+    {
+        var current =
+            Path.GetFullPath(
+                Environment.ProcessPath ??
+                string.Empty);
+
+        return string.Equals(
+            current,
+            Path.GetFullPath(
+                paths.InstalledExePath),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? ReadActivationFromExecutableName()
+    {
+        var fileName =
+            Path.GetFileNameWithoutExtension(
+                Environment.ProcessPath ??
+                string.Empty);
+
+        var match =
+            ActivationPattern.Match(fileName);
+
+        return match.Success
+            ? match.Value.ToUpperInvariant()
+            : null;
+    }
+
+    private static bool HasArg(
+        string[] args,
+        string value)
+        => args.Any(
+            item => string.Equals(
+                item,
+                value,
+                StringComparison.OrdinalIgnoreCase));
+
+    private static string? GetArgValue(
+        string[] args,
+        string name)
+    {
+        for (var index = 0;
+             index < args.Length - 1;
+             index++)
+        {
+            if (string.Equals(
+                    args[index],
+                    name,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return args[index + 1];
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsAdministrator()
+    {
+        using var identity =
+            WindowsIdentity.GetCurrent();
+
+        var principal =
+            new WindowsPrincipal(identity);
+
+        return principal.IsInRole(
+            WindowsBuiltInRole.Administrator);
+    }
+
+    internal static string MachineGuid()
+        => Convert.ToString(
+               Registry.GetValue(
+                   @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography",
+                   "MachineGuid",
+                   null))
+           ?.Trim()
+           ?? string.Empty;
+
+    internal static string Limit(
+        string? text,
+        int max)
+    {
+        var value = text ?? string.Empty;
+        return value.Length <= max
+            ? value
+            : value[..max];
+    }
 }
 
-internal sealed class AgentConfig
+internal sealed class AgentPaths
 {
-    [JsonPropertyName("project_url")]
-    public string ProjectUrl { get; set; } = "";
+    public required string Root { get; init; }
+    public required string InstalledExePath { get; init; }
+    public required string ConfigPath { get; init; }
+    public required string StatePath { get; init; }
+    public required string LogPath { get; init; }
 
-    [JsonPropertyName("agent_token")]
-    public string AgentToken { get; set; } = "";
-}
+    public static AgentPaths Create()
+    {
+        var root = Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.CommonApplicationData),
+            "WisdomTI",
+            "Agent");
 
-internal sealed class AgentPayload
-{
-    [JsonPropertyName("protocol_version")]
-    public string ProtocolVersion { get; set; } = "";
-
-    [JsonPropertyName("agent_version")]
-    public string AgentVersion { get; set; } = "";
-
-    [JsonPropertyName("collected_at")]
-    public DateTimeOffset CollectedAt { get; set; }
-
-    [JsonPropertyName("machine")]
-    public MachineInfo Machine { get; set; } = new();
-
-    [JsonPropertyName("os")]
-    public OsInfo Os { get; set; } = new();
-
-    [JsonPropertyName("hardware")]
-    public HardwareInfo Hardware { get; set; } = new();
-
-    [JsonPropertyName("disks")]
-    public List<DiskInfo> Disks { get; set; } = [];
-
-    [JsonPropertyName("software")]
-    public List<SoftwareInfo> Software { get; set; } = [];
-
-    [JsonPropertyName("health")]
-    public Dictionary<string, object?> Health { get; set; } = [];
-}
-
-internal sealed class InventoryResult
-{
-    [JsonPropertyName("machine")]
-    public MachineInfo Machine { get; set; } = new();
-
-    [JsonPropertyName("os")]
-    public OsInfo Os { get; set; } = new();
-
-    [JsonPropertyName("hardware")]
-    public HardwareInfo Hardware { get; set; } = new();
-
-    [JsonPropertyName("disks")]
-    public List<DiskInfo> Disks { get; set; } = [];
-
-    [JsonPropertyName("software")]
-    public List<SoftwareInfo> Software { get; set; } = [];
-}
-
-internal sealed class MachineInfo
-{
-    [JsonPropertyName("machine_guid")]
-    public string? MachineGuid { get; set; }
-
-    [JsonPropertyName("hostname")]
-    public string? Hostname { get; set; }
-
-    [JsonPropertyName("manufacturer")]
-    public string? Manufacturer { get; set; }
-
-    [JsonPropertyName("model")]
-    public string? Model { get; set; }
-
-    [JsonPropertyName("serial_number")]
-    public string? SerialNumber { get; set; }
-}
-
-internal sealed class OsInfo
-{
-    [JsonPropertyName("name")]
-    public string? Name { get; set; }
-
-    [JsonPropertyName("version")]
-    public string? Version { get; set; }
-
-    [JsonPropertyName("build")]
-    public string? Build { get; set; }
-
-    [JsonPropertyName("architecture")]
-    public string? Architecture { get; set; }
-
-    [JsonPropertyName("last_boot_utc")]
-    public string? LastBootUtc { get; set; }
-}
-
-internal sealed class HardwareInfo
-{
-    [JsonPropertyName("cpu_name")]
-    public string? CpuName { get; set; }
-
-    [JsonPropertyName("cpu_cores")]
-    public int? CpuCores { get; set; }
-
-    [JsonPropertyName("logical_processors")]
-    public int? LogicalProcessors { get; set; }
-
-    [JsonPropertyName("ram_bytes")]
-    public long? RamBytes { get; set; }
-}
-
-internal sealed class DiskInfo
-{
-    [JsonPropertyName("device_id")]
-    public string? DeviceId { get; set; }
-
-    [JsonPropertyName("label")]
-    public string? Label { get; set; }
-
-    [JsonPropertyName("size_bytes")]
-    public long? SizeBytes { get; set; }
-
-    [JsonPropertyName("free_bytes")]
-    public long? FreeBytes { get; set; }
-
-    [JsonPropertyName("system_drive")]
-    public bool SystemDrive { get; set; }
-}
-
-internal sealed class SoftwareInfo
-{
-    [JsonPropertyName("name")]
-    public string? Name { get; set; }
-
-    [JsonPropertyName("version")]
-    public string? Version { get; set; }
-
-    [JsonPropertyName("publisher")]
-    public string? Publisher { get; set; }
+        return new AgentPaths
+        {
+            Root = root,
+            InstalledExePath =
+                Path.Combine(
+                    root,
+                    "WisdomTI.Agent.exe"),
+            ConfigPath =
+                Path.Combine(
+                    root,
+                    "agent.json"),
+            StatePath =
+                Path.Combine(
+                    root,
+                    "state.json"),
+            LogPath =
+                Path.Combine(
+                    root,
+                    "logs",
+                    "agent.log"),
+        };
+    }
 }
 
 internal sealed class AgentLog
 {
     private readonly string _path;
 
-    public AgentLog()
+    public AgentLog(string path)
     {
-        var root = Path.Combine(
-            Environment.GetFolderPath(
-                Environment.SpecialFolder.CommonApplicationData),
-            "WisdomTI",
-            "Agent",
-            "logs");
+        _path = path;
 
-        Directory.CreateDirectory(root);
-        _path = Path.Combine(root, "agent.log");
+        Directory.CreateDirectory(
+            Path.GetDirectoryName(path)!);
 
         try
         {
             if (File.Exists(_path) &&
-                new FileInfo(_path).Length > 5_000_000)
+                new FileInfo(_path).Length >
+                    5_000_000)
             {
                 File.Move(
                     _path,
                     Path.Combine(
-                        root,
+                        Path.GetDirectoryName(_path)!,
                         $"agent-{DateTime.UtcNow:yyyyMMddHHmmss}.log"),
                     overwrite: true);
             }
         }
         catch
         {
-            // Logging must not prevent inventory.
+            // Logging must never block the agent.
         }
     }
 
@@ -320,164 +431,11 @@ internal sealed class AgentLog
         {
             File.AppendAllText(
                 _path,
-                $"{DateTimeOffset.Now:O} {message}{Environment.NewLine}",
-                Encoding.UTF8);
+                $"{DateTimeOffset.Now:O} {message}{Environment.NewLine}");
         }
         catch
         {
-            // Do not fail the agent because of logging.
+            // Logging must never block the agent.
         }
     }
-}
-
-internal static class InventoryCollector
-{
-    private const string Script = """
-$ErrorActionPreference = 'Stop'
-
-$cs = Get-CimInstance Win32_ComputerSystem
-$bios = Get-CimInstance Win32_BIOS
-$cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
-$os = Get-CimInstance Win32_OperatingSystem
-$guid = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid).MachineGuid
-$systemDrive = $env:SystemDrive
-
-$disks = @(
-    Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" |
-        ForEach-Object {
-            [pscustomobject]@{
-                device_id = $_.DeviceID
-                label = $_.VolumeName
-                size_bytes = [int64]$_.Size
-                free_bytes = [int64]$_.FreeSpace
-                system_drive = ($_.DeviceID -eq $systemDrive)
-            }
-        }
-)
-
-$softwareRows = New-Object System.Collections.Generic.List[object]
-$paths = @(
-    'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
-    'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
-    'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
-)
-
-foreach ($path in $paths) {
-    Get-ItemProperty $path -ErrorAction SilentlyContinue |
-        Where-Object { $_.DisplayName } |
-        ForEach-Object {
-            $softwareRows.Add(
-                [pscustomobject]@{
-                    name = [string]$_.DisplayName
-                    version = [string]$_.DisplayVersion
-                    publisher = [string]$_.Publisher
-                }
-            )
-        }
-}
-
-$software = @(
-    $softwareRows |
-        Sort-Object name, version, publisher -Unique |
-        Select-Object -First 2000
-)
-
-$result = [pscustomobject]@{
-    machine = [pscustomobject]@{
-        machine_guid = [string]$guid
-        hostname = [string]$env:COMPUTERNAME
-        manufacturer = [string]$cs.Manufacturer
-        model = [string]$cs.Model
-        serial_number = [string]$bios.SerialNumber
-    }
-    os = [pscustomobject]@{
-        name = [string]$os.Caption
-        version = [string]$os.Version
-        build = [string]$os.BuildNumber
-        architecture = [string]$os.OSArchitecture
-        last_boot_utc = ([DateTime]$os.LastBootUpTime).ToUniversalTime().ToString('o')
-    }
-    hardware = [pscustomobject]@{
-        cpu_name = [string]$cpu.Name
-        cpu_cores = [int]$cpu.NumberOfCores
-        logical_processors = [int]$cpu.NumberOfLogicalProcessors
-        ram_bytes = [int64]$cs.TotalPhysicalMemory
-    }
-    disks = $disks
-    software = $software
-}
-
-$result | ConvertTo-Json -Depth 7 -Compress
-""";
-
-    public static async Task<InventoryResult> CollectAsync(AgentLog log)
-    {
-        var shell = Path.Combine(
-            Environment.GetFolderPath(
-                Environment.SpecialFolder.System),
-            "WindowsPowerShell",
-            "v1.0",
-            "powershell.exe");
-
-        if (!File.Exists(shell))
-        {
-            shell = "powershell.exe";
-        }
-
-        var encoded = Convert.ToBase64String(
-            Encoding.Unicode.GetBytes(Script));
-
-        var start = new ProcessStartInfo
-        {
-            FileName = shell,
-            Arguments =
-                $"-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-
-        using var process = Process.Start(start)
-            ?? throw new InvalidOperationException(
-                "Could not start Windows PowerShell.");
-
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
-        var stderrTask = process.StandardError.ReadToEndAsync();
-
-        await process.WaitForExitAsync();
-
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
-
-        if (process.ExitCode != 0)
-        {
-            log.Write($"Collector stderr: {stderr}");
-            throw new InvalidOperationException(
-                $"Inventory collector failed with exit code {process.ExitCode}.");
-        }
-
-        if (string.IsNullOrWhiteSpace(stdout))
-        {
-            throw new InvalidOperationException(
-                "Inventory collector returned empty JSON.");
-        }
-
-        return JsonSerializer.Deserialize<InventoryResult>(
-            stdout,
-            JsonOptions.Default)
-            ?? throw new InvalidOperationException(
-                "Inventory JSON could not be parsed.");
-    }
-}
-
-internal static class JsonOptions
-{
-    public static readonly JsonSerializerOptions Default = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition =
-            JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false,
-    };
 }

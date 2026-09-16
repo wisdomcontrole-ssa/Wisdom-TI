@@ -9,28 +9,30 @@ import { isSupabaseConfigured } from './lib/supabase'
 import { AlertsPage } from './pages/AlertsPage'
 import { AssetCodePage } from './pages/AssetCodePage'
 import { AssetDetailPage } from './pages/AssetDetailPage'
+import { AssetLookupPage } from './pages/AssetLookupPage'
 import { AssetsPage } from './pages/AssetsPage'
 import { AuditExecutionPage } from './pages/AuditExecutionPage'
 import { AuditsPage } from './pages/AuditsPage'
 import { BackendSetupPage } from './pages/BackendSetupPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { FieldScannerPage } from './pages/FieldScannerPage'
+import { IdentifyCodePage } from './pages/IdentifyCodePage'
 import { InventoryPage } from './pages/InventoryPage'
+import { LabelsPage } from './pages/LabelsPage'
 import { LocationsPage } from './pages/LocationsPage'
 import { LoginPage } from './pages/LoginPage'
 import { LogsPage } from './pages/LogsPage'
 import { MaintenanceDetailPage } from './pages/MaintenanceDetailPage'
 import { MaintenancePage } from './pages/MaintenancePage'
+import { MaintenanceRequestsPage } from './pages/MaintenanceRequestsPage'
+import { PendingRegistrationsPage } from './pages/PendingRegistrationsPage'
+import { PublicSupportPage } from './pages/PublicSupportPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StockDetailPage } from './pages/StockDetailPage'
 import { UnauthorizedPage } from './pages/UnauthorizedPage'
 import { UsersPage } from './pages/UsersPage'
 
-import { FieldScannerPage } from './pages/FieldScannerPage'
-import { IdentifyCodePage } from './pages/IdentifyCodePage'
-import { LabelsPage } from './pages/LabelsPage'
-import { PendingRegistrationsPage } from './pages/PendingRegistrationsPage'
-import { AssetLookupPage } from './pages/AssetLookupPage'
 export default function App() {
   if (!isSupabaseConfigured) {
     return <BackendSetupPage />
@@ -41,6 +43,11 @@ export default function App() {
       <Route
         path="/login"
         element={<LoginPage />}
+      />
+
+      <Route
+        path="/suporte"
+        element={<PublicSupportPage />}
       />
 
       <Route element={<ProtectedRoute />}>
@@ -90,6 +97,17 @@ export default function App() {
             <Route
               path="/manutencoes/:maintenanceId"
               element={<MaintenanceDetailPage />}
+            />
+          </Route>
+
+          <Route
+            element={
+              <ProtectedRoute permission="maintenance.requests.view" />
+            }
+          >
+            <Route
+              path="/manutencoes/chamados"
+              element={<MaintenanceRequestsPage />}
             />
           </Route>
 
@@ -188,6 +206,7 @@ export default function App() {
               element={<SettingsPage />}
             />
           </Route>
+
           <Route
             element={
               <ProtectedRoute permission="assets.view" />

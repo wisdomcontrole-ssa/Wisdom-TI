@@ -1,137 +1,343 @@
 import {
   AlertTriangle,
   Check,
-  Copy,
-  Cpu,
+  Download,
   HardDrive,
-  KeyRound,
+  MemoryStick,
   MonitorCog,
   Package,
   RefreshCw,
   RotateCw,
-  Search,
   ShieldOff,
+  Stethoscope,
+  Wrench,
   Wifi,
   WifiOff,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { useAuth } from '../../auth/useAuth'
 import {
   adoptDetectedInventory,
-  createAgentEnrollment,
+  createAgentActivation,
+  downloadAgentInstaller,
   getInventoryExpectation,
   getLatestAssetSnapshot,
+  listAssetAgentCommands,
   listAssetAgents,
   listAssetOpenDivergences,
+  queueAgentCommand,
   revokeAgent,
   rotateAgentToken,
 } from '../../data/agent-service'
 import type {
+  AgentCommandRecord,
+  AgentCommandType,
   AgentDeviceRecord,
   AgentDivergenceRecord,
   AgentInventorySnapshotRecord,
   InventoryExpectationRecord,
 } from '../../types/agent'
-import type { AssetRecord } from '../../types/assets'
+import type {
+  AssetRecord,
+} from '../../types/assets'
 import { FormModal } from '../ui/FormModal'
 import { StatusPill } from '../ui/StatusPill'
 
-export function AssetAgentPanel({ asset }: { asset: AssetRecord }) {
+const actionOptions: Array<{
+  value: AgentCommandType
+  label: string
+  description: string
+  risk: 'diagnostic' | 'maintenance'
+}> = [
+  {
+    value: 'collect_diagnostics',
+    label: 'Coletar diagnóstico agora',
+    description:
+      'Atualiza inventário, eventos do Windows e executa uma verificação rápida da integridade do sistema.',
+    risk: 'diagnostic',
+  },
+  {
+    value: 'sfc_verify',
+    label: 'Verificar arquivos do Windows (SFC)',
+    description:
+      'Executa somente a verificação dos arquivos protegidos do Windows.',
+    risk: 'diagnostic',
+  },
+  {
+    value: 'dism_scanhealth',
+    label: 'Verificar imagem do Windows (DISM)',
+    description:
+      'Analisa a integridade da imagem do Windows sem reparar.',
+    risk: 'diagnostic',
+  },
+  {
+    value: 'flush_dns',
+    label: 'Limpar cache DNS',
+    description:
+      'Limpa o cache local de resolução de nomes.',
+    risk: 'maintenance',
+  },
+  {
+    value: 'cleanup_temp',
+    label: 'Limpeza segura de temporários',
+    description:
+      'Remove arquivos temporários antigos que não estejam em uso.',
+    risk: 'maintenance',
+  },
+  {
+    value: 'optimize_system_drive',
+    label: 'Otimizar armazenamento',
+    description:
+      'Solicita ao Windows a otimização apropriada para a mídia instalada.',
+    risk: 'maintenance',
+  },
+  {
+    value: 'sfc_scannow',
+    label: 'Reparar arquivos do Windows (SFC)',
+    description:
+      'Verifica e tenta reparar arquivos protegidos do Windows.',
+    risk: 'maintenance',
+  },
+  {
+    value: 'dism_restorehealth',
+    label: 'Reparar imagem do Windows (DISM)',
+    description:
+      'Tenta reparar a imagem do sistema operacional.',
+    risk: 'maintenance',
+  },
+]
+
+const commandLabels =
+  new Map(
+    actionOptions.map((item) => [
+      item.value,
+      item.label,
+    ]),
+  )
+
+const statusTone = {
+  queued: 'info',
+  running: 'warning',
+  completed: 'success',
+  failed: 'danger',
+  cancelled: 'neutral',
+} as const
+
+const statusLabels = {
+  queued: 'Na fila',
+  running: 'Executando',
+  completed: 'Concluído',
+  failed: 'Falhou',
+  cancelled: 'Cancelado',
+} as const
+
+export function AssetAgentPanel({
+  asset,
+}: {
+  asset: AssetRecord
+}) {
   const { hasPermission } = useAuth()
-  const canManage = hasPermission('assets.update')
-  const [agents, setAgents] = useState<AgentDeviceRecord[]>([])
-  const [snapshot, setSnapshot] = useState<AgentInventorySnapshotRecord | null>(null)
-  const [divergences, setDivergences] = useState<AgentDivergenceRecord[]>([])
-  const [expectation, setExpectation] = useState<InventoryExpectationRecord | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [online, setOnline] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [enrollmentToken, setEnrollmentToken] = useState<string | null>(null)
-  const [revokeTarget, setRevokeTarget] = useState<AgentDeviceRecord | null>(null)
-  const [softwareOpen, setSoftwareOpen] = useState(false)
+  const canManage =
+    hasPermission('agents.manage') ||
+    hasPermission('assets.update')
+  const canRemote =
+    hasPermission('agents.remote') ||
+    hasPermission('assets.update')
 
-  useEffect(() => {
-    let active = true
-
-    async function bootstrap() {
-      try {
-        const data = await load(asset.id)
-        if (!active) return
-        setAgents(data.agents)
-        setSnapshot(data.snapshot)
-        setDivergences(data.divergences)
-        setExpectation(data.expectation)
-        setOnline(data.online)
-      } catch (error) {
-        if (!active) return
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : 'Não foi possível carregar o inventário automático.',
-        )
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
-
-    void bootstrap()
-
-    return () => {
-      active = false
-    }
-  }, [asset.id])
+  const [agents, setAgents] = useState<
+    AgentDeviceRecord[]
+  >([])
+  const [snapshot, setSnapshot] =
+    useState<AgentInventorySnapshotRecord | null>(
+      null,
+    )
+  const [divergences, setDivergences] =
+    useState<AgentDivergenceRecord[]>([])
+  const [expectation, setExpectation] =
+    useState<InventoryExpectationRecord | null>(
+      null,
+    )
+  const [commands, setCommands] =
+    useState<AgentCommandRecord[]>([])
+  const [loading, setLoading] =
+    useState(true)
+  const [online, setOnline] =
+    useState(false)
+  const [busy, setBusy] =
+    useState(false)
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null)
+  const [
+    activationMessage,
+    setActivationMessage,
+  ] = useState<string | null>(null)
+  const [
+    actionOpen,
+    setActionOpen,
+  ] = useState(false)
+  const [
+    revokeTarget,
+    setRevokeTarget,
+  ] =
+    useState<AgentDeviceRecord | null>(null)
+  const [softwareOpen, setSoftwareOpen] =
+    useState(false)
 
   async function refresh() {
     try {
       setLoading(true)
       setErrorMessage(null)
+
       const data = await load(asset.id)
+
       setAgents(data.agents)
       setSnapshot(data.snapshot)
-      setDivergences(data.divergences)
-      setExpectation(data.expectation)
+      setDivergences(
+        data.divergences,
+      )
+      setExpectation(
+        data.expectation,
+      )
+      setCommands(data.commands)
       setOnline(data.online)
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'Não foi possível atualizar o inventário.',
+          : 'Não foi possível atualizar o inventário automático.',
       )
     } finally {
       setLoading(false)
     }
   }
 
+  useEffect(() => {
+    let active = true
+
+    void load(asset.id)
+      .then((data) => {
+        if (!active) return
+        setAgents(data.agents)
+        setSnapshot(data.snapshot)
+        setDivergences(
+          data.divergences,
+        )
+        setExpectation(
+          data.expectation,
+        )
+        setCommands(data.commands)
+        setOnline(data.online)
+      })
+      .catch((error) => {
+        if (!active) return
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível carregar o inventário automático.',
+        )
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [asset.id])
+
   const activeAgent = useMemo(
-    () => agents.find((agent) => agent.status === 'active') ?? null,
+    () =>
+      agents.find(
+        (agent) =>
+          agent.status === 'active',
+      ) ?? null,
     [agents],
   )
 
   const sortedSoftware = useMemo(
     () =>
       [...(snapshot?.software ?? [])]
-        .filter((software) => software.name?.trim())
+        .filter((item) =>
+          item.name?.trim(),
+        )
         .sort((a, b) =>
-          (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR', {
-            sensitivity: 'base',
-          }),
+          (a.name ?? '').localeCompare(
+            b.name ?? '',
+            'pt-BR',
+            {
+              sensitivity: 'base',
+            },
+          ),
         ),
     [snapshot],
   )
 
-  async function createEnrollment() {
+  const health =
+    snapshot?.health ?? {}
+  const diagnostics =
+    health.diagnostics
+  const memoryModules =
+    health.memory_modules ?? []
+  const physicalDisks =
+    health.physical_disks ?? []
+
+  async function downloadInstaller() {
     try {
       setBusy(true)
       setErrorMessage(null)
-      const result = await createAgentEnrollment(asset.id)
-      setEnrollmentToken(result.token)
+
+      const activation =
+        await createAgentActivation(
+          asset.id,
+        )
+
+      await downloadAgentInstaller(
+        activation.activation_code,
+      )
+
+      setActivationMessage(
+        `Instalador preparado para ${asset.asset_code}. ` +
+          `Código de recuperação: ${activation.activation_code}. ` +
+          `Válido até ${new Date(
+            activation.expires_at,
+          ).toLocaleString('pt-BR')}.`,
+      )
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível preparar o instalador.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function quickDiagnostic() {
+    try {
+      setBusy(true)
+      setErrorMessage(null)
+
+      await queueAgentCommand({
+        assetId: asset.id,
+        commandType:
+          'collect_diagnostics',
+        reason:
+          'Diagnóstico solicitado pela ficha do patrimônio.',
+      })
+
       await refresh()
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'Não foi possível criar o agente.',
+          : 'Não foi possível solicitar o diagnóstico.',
       )
     } finally {
       setBusy(false)
@@ -144,14 +350,21 @@ export function AssetAgentPanel({ asset }: { asset: AssetRecord }) {
     try {
       setBusy(true)
       setErrorMessage(null)
-      const result = await rotateAgentToken(activeAgent.id)
-      setEnrollmentToken(result.token)
+
+      await rotateAgentToken(
+        activeAgent.id,
+      )
+
       await refresh()
+
+      setActivationMessage(
+        'A credencial foi rotacionada. Gere um novo instalador deste ativo para reconfigurar a máquina.',
+      )
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'Não foi possível rotacionar o token.',
+          : 'Não foi possível rotacionar a credencial.',
       )
     } finally {
       setBusy(false)
@@ -164,7 +377,13 @@ export function AssetAgentPanel({ asset }: { asset: AssetRecord }) {
     try {
       setBusy(true)
       setErrorMessage(null)
-      await adoptDetectedInventory(asset, snapshot, expectation)
+
+      await adoptDetectedInventory(
+        asset,
+        snapshot,
+        expectation,
+      )
+
       await refresh()
     } catch (error) {
       setErrorMessage(
@@ -185,9 +404,11 @@ export function AssetAgentPanel({ asset }: { asset: AssetRecord }) {
             <MonitorCog size={16} />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-950">Inventário automático</h2>
+            <h2 className="text-sm font-bold text-slate-950">
+              Inventário e suporte do endpoint
+            </h2>
             <p className="mt-0.5 text-[11px] text-slate-400">
-              Agente Windows, hardware, software, heartbeat e divergências
+              Inventário Windows, saúde, diagnóstico e ações remotas auditadas
             </p>
           </div>
         </div>
@@ -198,7 +419,14 @@ export function AssetAgentPanel({ asset }: { asset: AssetRecord }) {
           disabled={loading}
           className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 disabled:opacity-50"
         >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw
+            size={13}
+            className={
+              loading
+                ? 'animate-spin'
+                : ''
+            }
+          />
           Atualizar
         </button>
       </header>
@@ -209,7 +437,13 @@ export function AssetAgentPanel({ asset }: { asset: AssetRecord }) {
         </div>
       )}
 
-      <div className="grid gap-5 p-5 xl:grid-cols-[1fr_1.45fr]">
+      {activationMessage && (
+        <div className="border-b border-sky-100 bg-sky-50 px-5 py-3 text-xs leading-5 text-sky-800">
+          {activationMessage}
+        </div>
+      )}
+
+      <div className="grid gap-5 p-5 xl:grid-cols-[0.9fr_1.4fr]">
         <div className="space-y-4">
           <div className="rounded-xl border border-slate-200 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -222,26 +456,38 @@ export function AssetAgentPanel({ asset }: { asset: AssetRecord }) {
                   <>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-sm font-bold text-slate-900">
-                        {activeAgent.hostname ?? asset.hostname ?? 'Aguardando heartbeat'}
+                        {activeAgent.hostname ??
+                          asset.hostname ??
+                          'Aguardando identificação'}
                       </span>
-                      <StatusPill tone={online ? 'success' : 'warning'}>
-                        {online ? 'Online' : 'Sem comunicação'}
+                      <StatusPill
+                        tone={
+                          online
+                            ? 'success'
+                            : 'warning'
+                        }
+                      >
+                        {online
+                          ? 'Online'
+                          : 'Sem comunicação'}
                       </StatusPill>
                     </div>
 
                     <div className="mt-2 space-y-1 text-[11px] text-slate-500">
                       <div>
-                        Token:{' '}
-                        <span className="font-mono">
-                          {activeAgent.token_prefix}...
-                        </span>
+                        Versão:{' '}
+                        {activeAgent.agent_version ??
+                          '—'}
                       </div>
-                      <div>Versão: {activeAgent.agent_version ?? '—'}</div>
                       <div>
-                        Último heartbeat:{' '}
+                        Última comunicação:{' '}
                         {activeAgent.last_seen_at
-                          ? new Date(activeAgent.last_seen_at).toLocaleString('pt-BR')
-                          : 'ainda não recebido'}
+                          ? new Date(
+                              activeAgent.last_seen_at,
+                            ).toLocaleString(
+                              'pt-BR',
+                            )
+                          : 'ainda não recebida'}
                       </div>
                     </div>
                   </>
@@ -252,100 +498,174 @@ export function AssetAgentPanel({ asset }: { asset: AssetRecord }) {
                 )}
               </div>
 
-              {activeAgent ? (
-                online ? (
-                  <Wifi size={18} className="text-emerald-500" />
-                ) : (
-                  <WifiOff size={18} className="text-amber-500" />
-                )
+              {activeAgent &&
+              online ? (
+                <Wifi
+                  size={18}
+                  className="text-emerald-500"
+                />
               ) : (
-                <WifiOff size={18} className="text-slate-300" />
+                <WifiOff
+                  size={18}
+                  className="text-slate-300"
+                />
               )}
             </div>
 
             {canManage && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {!activeAgent ? (
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    void downloadInstaller()
+                  }
+                  disabled={
+                    busy ||
+                    asset.status ===
+                      'disposed'
+                  }
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40"
+                >
+                  <Download size={13} />
+                  {activeAgent
+                    ? 'Baixar instalador / reinstalar'
+                    : 'Baixar instalador deste ativo'}
+                </button>
+
+                {activeAgent && (
                   <button
                     type="button"
-                    onClick={() => void createEnrollment()}
-                    disabled={busy || asset.status === 'disposed'}
-                    className="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40"
+                    onClick={() =>
+                      void quickDiagnostic()
+                    }
+                    disabled={
+                      busy || !canRemote
+                    }
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-800 disabled:opacity-40"
                   >
-                    <KeyRound size={13} />
-                    Criar agente
+                    <Stethoscope
+                      size={13}
+                    />
+                    Diagnóstico agora
                   </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void rotateToken()}
-                      disabled={busy}
-                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 disabled:opacity-40"
-                    >
-                      <RotateCw size={13} />
-                      Rotacionar token
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRevokeTarget(activeAgent)}
-                      disabled={busy}
-                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-red-200 px-3 text-xs font-semibold text-red-600 disabled:opacity-40"
-                    >
-                      <ShieldOff size={13} />
-                      Revogar
-                    </button>
-                  </>
                 )}
               </div>
             )}
+
+            {canManage &&
+              activeAgent && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {canRemote && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setActionOpen(
+                          true,
+                        )
+                      }
+                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600"
+                    >
+                      <Wrench size={13} />
+                      Manutenção remota
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void rotateToken()
+                    }
+                    disabled={busy}
+                    className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 disabled:opacity-40"
+                  >
+                    <RotateCw size={13} />
+                    Rotacionar credencial
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRevokeTarget(
+                        activeAgent,
+                      )
+                    }
+                    disabled={busy}
+                    className="inline-flex h-9 items-center gap-2 rounded-xl border border-red-200 px-3 text-xs font-semibold text-red-600 disabled:opacity-40"
+                  >
+                    <ShieldOff size={13} />
+                    Revogar
+                  </button>
+                </div>
+              )}
           </div>
 
           <div className="rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
-                  Baseline esperado
-                </div>
-                <div className="mt-1 text-xs text-slate-500">
-                  Patrimônio esperado x inventário detectado.
-                </div>
-              </div>
-              <Cpu size={17} className="text-slate-300" />
+            <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
+              Baseline esperado
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              Patrimônio cadastrado x inventário detectado.
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-              <Spec label="CPU" value={expectation?.expected_cpu_name ?? 'não definido'} />
+              <Spec
+                label="CPU"
+                value={
+                  expectation
+                    ?.expected_cpu_name ??
+                  'não definido'
+                }
+              />
               <Spec
                 label="RAM"
                 value={
-                  expectation?.expected_ram_bytes
-                    ? formatBytes(expectation.expected_ram_bytes)
+                  expectation
+                    ?.expected_ram_bytes
+                    ? formatBytes(
+                        expectation.expected_ram_bytes,
+                      )
                     : 'não definida'
                 }
               />
               <Spec
                 label="Serial"
-                value={expectation?.expected_serial_number ?? asset.serial_number ?? '—'}
+                value={
+                  expectation
+                    ?.expected_serial_number ??
+                  asset.serial_number ??
+                  '—'
+                }
               />
               <Spec
                 label="Hostname"
-                value={expectation?.expected_hostname ?? asset.hostname ?? '—'}
+                value={
+                  expectation
+                    ?.expected_hostname ??
+                  asset.hostname ??
+                  '—'
+                }
               />
             </div>
 
-            {canManage && snapshot && (
-              <button
-                type="button"
-                onClick={() => void adoptBaseline()}
-                disabled={busy}
-                className="mt-4 inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 disabled:opacity-40"
-              >
-                <Check size={13} />
-                Adotar inventário detectado
-              </button>
-            )}
+            {canManage &&
+              snapshot && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void adoptBaseline()
+                  }
+                  disabled={busy}
+                  className="mt-4 inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 disabled:opacity-40"
+                >
+                  <Check size={13} />
+                  Adotar inventário detectado
+                </button>
+              )}
           </div>
+
+          <CommandHistory
+            commands={commands}
+          />
         </div>
 
         <div className="space-y-4">
@@ -354,7 +674,10 @@ export function AssetAgentPanel({ asset }: { asset: AssetRecord }) {
               <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
                 Último inventário
               </div>
-              <HardDrive size={16} className="text-slate-300" />
+              <HardDrive
+                size={16}
+                className="text-slate-300"
+              />
             </div>
 
             {!snapshot ? (
@@ -362,424 +685,698 @@ export function AssetAgentPanel({ asset }: { asset: AssetRecord }) {
                 Aguardando a primeira coleta do agente.
               </div>
             ) : (
-              <>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <Spec
-                    label="Sistema"
-                    value={[snapshot.os_name, snapshot.os_build].filter(Boolean).join(' · ')}
-                  />
-                  <Spec label="CPU" value={snapshot.cpu_name ?? '—'} />
-                  <Spec
-                    label="RAM"
-                    value={snapshot.ram_bytes ? formatBytes(snapshot.ram_bytes) : '—'}
-                  />
-                  <Spec label="Hostname" value={snapshot.hostname ?? '—'} />
-                  <Spec
-                    label="Fabricante / modelo"
-                    value={[snapshot.manufacturer, snapshot.model].filter(Boolean).join(' · ')}
-                  />
-                  <Spec label="Serial" value={snapshot.serial_number ?? '—'} />
-                  <Spec
-                    label="Coleta"
-                    value={new Date(snapshot.received_at).toLocaleString('pt-BR')}
-                  />
-                  <Spec
-                    label="Arquitetura"
-                    value={snapshot.os_architecture ?? '—'}
-                  />
-                </div>
-              </>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <Spec
+                  label="Sistema"
+                  value={[
+                    snapshot.os_name,
+                    snapshot.os_build,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                />
+                <Spec
+                  label="CPU"
+                  value={
+                    snapshot.cpu_name ??
+                    '—'
+                  }
+                />
+                <Spec
+                  label="RAM"
+                  value={
+                    snapshot.ram_bytes
+                      ? formatBytes(
+                          snapshot.ram_bytes,
+                        )
+                      : '—'
+                  }
+                />
+                <Spec
+                  label="Placa-mãe"
+                  value={[
+                    health.motherboard
+                      ?.manufacturer,
+                    health.motherboard
+                      ?.model,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                />
+                <Spec
+                  label="Hostname"
+                  value={
+                    snapshot.hostname ??
+                    '—'
+                  }
+                />
+                <Spec
+                  label="Coleta"
+                  value={new Date(
+                    snapshot.received_at,
+                  ).toLocaleString(
+                    'pt-BR',
+                  )}
+                />
+              </div>
             )}
           </div>
 
           {snapshot && (
-            <StorageSection disks={snapshot.disks} />
+            <DiagnosticsCard
+              diagnostics={
+                diagnostics
+              }
+            />
           )}
+
+          {snapshot &&
+            memoryModules.length >
+              0 && (
+              <div className="rounded-xl border border-slate-200 p-4">
+                <div className="flex items-center gap-2">
+                  <MemoryStick
+                    size={15}
+                    className="text-slate-400"
+                  />
+                  <div className="text-xs font-bold text-slate-800">
+                    Módulos de memória
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {memoryModules.map(
+                    (module, index) => (
+                      <Spec
+                        key={`${module.slot}-${index}`}
+                        label={
+                          module.slot ||
+                          module.bank ||
+                          `Módulo ${index + 1}`
+                        }
+                        value={[
+                          module.capacity_bytes
+                            ? formatBytes(
+                                module.capacity_bytes,
+                              )
+                            : '',
+                          module.memory_type,
+                          module.configured_speed_mhz
+                            ? `${module.configured_speed_mhz} MHz`
+                            : '',
+                          module.manufacturer,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      />
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+
+          {snapshot &&
+            physicalDisks.length >
+              0 && (
+              <div className="rounded-xl border border-slate-200 p-4">
+                <div className="flex items-center gap-2">
+                  <HardDrive
+                    size={15}
+                    className="text-slate-400"
+                  />
+                  <div className="text-xs font-bold text-slate-800">
+                    Discos físicos
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {physicalDisks.map(
+                    (disk, index) => (
+                      <div
+                        key={`${disk.serial_number}-${index}`}
+                        className="rounded-xl bg-slate-50 p-3"
+                      >
+                        <div className="text-xs font-bold text-slate-800">
+                          {disk.model ||
+                            disk.friendly_name ||
+                            `Disco ${index + 1}`}
+                        </div>
+                        <div className="mt-1 text-[10px] text-slate-500">
+                          {[
+                            disk.size_bytes
+                              ? formatBytes(
+                                  disk.size_bytes,
+                                )
+                              : '',
+                            disk.media_type,
+                            disk.bus_type,
+                            disk.health_status,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </div>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
 
           {snapshot && (
             <div className="rounded-xl border border-slate-200">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <Package size={14} className="text-slate-400" />
+                  <Package
+                    size={14}
+                    className="text-slate-400"
+                  />
                   <span className="text-xs font-bold text-slate-800">
                     Programas instalados
                   </span>
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-500">
-                    {sortedSoftware.length}
+                    {
+                      sortedSoftware.length
+                    }
                   </span>
                 </div>
 
-                {sortedSoftware.length > 0 && (
+                {sortedSoftware.length >
+                  0 && (
                   <button
                     type="button"
-                    onClick={() => setSoftwareOpen(true)}
-                    className="text-[11px] font-bold text-sky-700 hover:text-sky-800"
+                    onClick={() =>
+                      setSoftwareOpen(
+                        true,
+                      )
+                    }
+                    className="text-[11px] font-bold text-sky-700"
                   >
                     Ver todos
                   </button>
                 )}
               </div>
 
-              {sortedSoftware.length === 0 ? (
+              {sortedSoftware.length ===
+              0 ? (
                 <div className="px-4 py-5 text-xs text-slate-400">
                   Nenhum programa identificado.
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {sortedSoftware.slice(0, 6).map((software, index) => (
-                    <div
-                      key={`${software.name}-${software.version}-${index}`}
-                      className="flex items-start justify-between gap-3 px-4 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate text-[11px] font-semibold text-slate-700">
-                          {software.name}
+                  {sortedSoftware
+                    .slice(0, 6)
+                    .map(
+                      (
+                        software,
+                        index,
+                      ) => (
+                        <div
+                          key={`${software.name}-${index}`}
+                          className="flex items-start justify-between gap-3 px-4 py-2.5"
+                        >
+                          <div className="min-w-0 truncate text-[11px] font-semibold text-slate-700">
+                            {
+                              software.name
+                            }
+                          </div>
+                          <div className="shrink-0 text-[9px] text-slate-400">
+                            {software.version ??
+                              '—'}
+                          </div>
                         </div>
-                        <div className="mt-0.5 truncate text-[9px] text-slate-400">
-                          {software.publisher || 'Fabricante não informado'}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-[9px] font-medium text-slate-400">
-                        {software.version || '—'}
-                      </div>
-                    </div>
-                  ))}
+                      ),
+                    )}
                 </div>
               )}
             </div>
           )}
 
           <div className="rounded-xl border border-slate-200">
-            <div className="border-b border-slate-100 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={14} className="text-amber-500" />
-                <span className="text-xs font-bold text-slate-800">
-                  Divergências abertas
-                </span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-500">
-                  {divergences.length}
-                </span>
-              </div>
+            <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
+              <AlertTriangle
+                size={14}
+                className="text-amber-500"
+              />
+              <span className="text-xs font-bold text-slate-800">
+                Divergências abertas
+              </span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-500">
+                {divergences.length}
+              </span>
             </div>
 
-            {divergences.length === 0 ? (
-              <div className="px-4 py-6 text-center text-xs text-slate-400">
+            {divergences.length ===
+            0 ? (
+              <div className="px-4 py-5 text-xs text-slate-400">
                 Nenhuma divergência aberta.
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {divergences.map((item) => (
-                  <div key={item.id} className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-bold text-slate-800">
+                {divergences.map(
+                  (item) => (
+                    <div
+                      key={item.id}
+                      className="px-4 py-3"
+                    >
+                      <div className="text-xs font-bold text-slate-800">
                         {item.title}
-                      </span>
-                      <StatusPill
-                        tone={
-                          item.severity === 'critical'
-                            ? 'danger'
-                            : item.severity === 'warning'
-                              ? 'warning'
-                              : 'info'
-                        }
-                      >
-                        {item.severity === 'critical'
-                          ? 'Crítico'
-                          : item.severity === 'warning'
-                            ? 'Atenção'
-                            : 'Info'}
-                      </StatusPill>
+                      </div>
+                      <div className="mt-1 text-[10px] text-slate-400">
+                        {item.divergence_key}
+                      </div>
                     </div>
-                    <div className="mt-1 font-mono text-[9px] text-slate-400">
-                      {item.divergence_key}
-                    </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {enrollmentToken && (
-        <EnrollmentModal
-          token={enrollmentToken}
-          onClose={() => setEnrollmentToken(null)}
-        />
-      )}
+      <RemoteActionModal
+        open={actionOpen}
+        assetId={asset.id}
+        busy={busy}
+        onBusy={setBusy}
+        onClose={() =>
+          setActionOpen(false)
+        }
+        onQueued={async () => {
+          setActionOpen(false)
+          await refresh()
+        }}
+        onError={setErrorMessage}
+      />
 
-      {revokeTarget && (
-        <RevokeModal
-          agent={revokeTarget}
-          onClose={() => setRevokeTarget(null)}
-          onDone={() => {
+      <RevokeModal
+        agent={revokeTarget}
+        busy={busy}
+        onClose={() =>
+          setRevokeTarget(null)
+        }
+        onConfirm={async (
+          reason,
+        ) => {
+          if (!revokeTarget) {
+            return
+          }
+
+          try {
+            setBusy(true)
+            setErrorMessage(null)
+
+            await revokeAgent(
+              revokeTarget.id,
+              reason,
+            )
+
             setRevokeTarget(null)
-            void refresh()
-          }}
-        />
-      )}
+            await refresh()
+          } catch (error) {
+            setErrorMessage(
+              error instanceof Error
+                ? error.message
+                : 'Não foi possível revogar o agente.',
+            )
+          } finally {
+            setBusy(false)
+          }
+        }}
+      />
 
-      {softwareOpen && snapshot && (
-        <SoftwareModal
-          software={sortedSoftware}
-          onClose={() => setSoftwareOpen(false)}
-        />
-      )}
+      <SoftwareModal
+        open={softwareOpen}
+        software={sortedSoftware}
+        onClose={() =>
+          setSoftwareOpen(false)
+        }
+      />
     </section>
   )
 }
 
-async function load(assetId: string) {
-  const [agents, snapshot, divergences, expectation] = await Promise.all([
+async function load(
+  assetId: string,
+) {
+  const [
+    agents,
+    snapshot,
+    divergences,
+    expectation,
+    commands,
+  ] = await Promise.all([
     listAssetAgents(assetId),
     getLatestAssetSnapshot(assetId),
-    listAssetOpenDivergences(assetId),
+    listAssetOpenDivergences(
+      assetId,
+    ),
     getInventoryExpectation(assetId),
+    listAssetAgentCommands(assetId),
   ])
 
-  const activeAgent = agents.find((agent) => agent.status === 'active')
+  const activeAgent =
+    agents.find(
+      (agent) =>
+        agent.status === 'active',
+    ) ?? null
 
   const online =
-    activeAgent?.last_seen_at != null &&
-    Date.now() - new Date(activeAgent.last_seen_at).getTime() < 30 * 60 * 1000
+    Boolean(
+      activeAgent?.last_seen_at,
+    ) &&
+    Date.now() -
+      new Date(
+        activeAgent!.last_seen_at!,
+      ).getTime() <
+      3 * 60 * 1000
 
   return {
     agents,
     snapshot,
     divergences,
     expectation,
+    commands,
     online,
   }
 }
 
-function StorageSection({
-  disks,
+function DiagnosticsCard({
+  diagnostics,
 }: {
-  disks: AgentInventorySnapshotRecord['disks']
+  diagnostics:
+    | AgentInventorySnapshotRecord['health']['diagnostics']
+    | undefined
+}) {
+  if (!diagnostics) {
+    return null
+  }
+
+  const findings = [
+    {
+      label:
+        'Reinicializações inesperadas (7 dias)',
+      value:
+        diagnostics
+          .unexpected_shutdowns_7d ??
+        0,
+    },
+    {
+      label:
+        'Telas azuis / BugCheck (7 dias)',
+      value:
+        diagnostics.bugchecks_7d ??
+        0,
+    },
+    {
+      label:
+        'Erros WHEA de hardware (7 dias)',
+      value:
+        diagnostics.whea_errors_7d ??
+        0,
+    },
+    {
+      label:
+        'Erros de memória registrados (30 dias)',
+      value:
+        diagnostics
+          .memory_diagnostic_errors_30d ??
+        0,
+    },
+    {
+      label:
+        'Falhas de aplicativos (7 dias)',
+      value:
+        diagnostics
+          .application_crashes_7d ??
+        0,
+    },
+  ]
+
+  return (
+    <div className="rounded-xl border border-slate-200 p-4">
+      <div className="flex items-center gap-2">
+        <Stethoscope
+          size={15}
+          className="text-slate-400"
+        />
+        <div className="text-xs font-bold text-slate-800">
+          Diagnóstico do Windows
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {findings.map((item) => (
+          <Spec
+            key={item.label}
+            label={item.label}
+            value={String(
+              item.value,
+            )}
+          />
+        ))}
+
+        <Spec
+          label="Espaço livre no disco do sistema"
+          value={
+            diagnostics
+              .system_drive_free_percent !==
+            undefined
+              ? `${diagnostics.system_drive_free_percent}%`
+              : '—'
+          }
+        />
+
+        <Spec
+          label="Reinicialização pendente"
+          value={
+            diagnostics.pending_reboot
+              ? 'Sim'
+              : 'Não'
+          }
+        />
+      </div>
+    </div>
+  )
+}
+
+function CommandHistory({
+  commands,
+}: {
+  commands: AgentCommandRecord[]
 }) {
   return (
     <div className="rounded-xl border border-slate-200">
-      <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
-        <HardDrive size={14} className="text-slate-400" />
-        <span className="text-xs font-bold text-slate-800">Armazenamento</span>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-500">
-          {disks.length}
-        </span>
+      <div className="border-b border-slate-100 px-4 py-3">
+        <div className="text-xs font-bold text-slate-800">
+          Ações remotas recentes
+        </div>
       </div>
 
-      {disks.length === 0 ? (
+      {commands.length === 0 ? (
         <div className="px-4 py-5 text-xs text-slate-400">
-          Nenhum volume identificado.
+          Nenhuma ação remota registrada.
         </div>
       ) : (
-        <div className="grid gap-3 p-4 sm:grid-cols-2">
-          {disks.map((disk, index) => {
-            const size = disk.size_bytes ?? 0
-            const free = disk.free_bytes ?? 0
-            const used = Math.max(0, size - free)
-            const usage = size > 0 ? Math.min(100, Math.round((used / size) * 100)) : 0
-
-            return (
+        <div className="divide-y divide-slate-100">
+          {commands
+            .slice(0, 8)
+            .map((command) => (
               <div
-                key={`${disk.device_id}-${index}`}
-                className="rounded-xl bg-slate-50 p-3"
+                key={command.id}
+                className="px-4 py-3"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-slate-800">
-                      {disk.device_id || `Volume ${index + 1}`}
-                      {disk.label ? ` · ${disk.label}` : ''}
-                    </div>
-                    <div className="mt-0.5 text-[9px] text-slate-400">
-                      {disk.system_drive ? 'Disco do sistema' : 'Volume local'}
-                    </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-[11px] font-bold text-slate-800">
+                    {commandLabels.get(
+                      command.command_type,
+                    ) ??
+                      command.command_type}
                   </div>
+                  <StatusPill
+                    tone={
+                      statusTone[
+                        command.status
+                      ]
+                    }
+                  >
+                    {
+                      statusLabels[
+                        command.status
+                      ]
+                    }
+                  </StatusPill>
+                </div>
 
-                  {disk.system_drive && (
-                    <StatusPill tone="info">Sistema</StatusPill>
+                <div className="mt-1 text-[10px] leading-4 text-slate-400">
+                  {new Date(
+                    command.requested_at,
+                  ).toLocaleString(
+                    'pt-BR',
                   )}
+                  {' · '}
+                  {command.reason}
                 </div>
 
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className="h-full rounded-full bg-slate-700"
-                    style={{ width: `${usage}%` }}
-                  />
-                </div>
-
-                <div className="mt-2 flex items-center justify-between text-[9px] text-slate-500">
-                  <span>{formatBytes(used)} usados</span>
-                  <span>{formatBytes(free)} livres</span>
-                </div>
-
-                <div className="mt-1 text-[10px] font-bold text-slate-700">
-                  Capacidade: {formatBytes(size)}
-                </div>
+                {command.result
+                  ?.summary && (
+                  <div className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] leading-4 text-slate-600">
+                    {
+                      command.result
+                        .summary
+                    }
+                  </div>
+                )}
               </div>
-            )
-          })}
+            ))}
         </div>
       )}
     </div>
   )
 }
 
-function SoftwareModal({
-  software,
+function RemoteActionModal({
+  open,
+  assetId,
+  busy,
+  onBusy,
   onClose,
+  onQueued,
+  onError,
 }: {
-  software: AgentInventorySnapshotRecord['software']
+  open: boolean
+  assetId: string
+  busy: boolean
+  onBusy: (value: boolean) => void
   onClose: () => void
+  onQueued: () => Promise<void>
+  onError: (
+    message: string | null,
+  ) => void
 }) {
-  const [query, setQuery] = useState('')
-
-  const filtered = useMemo(() => {
-    const clean = query.trim().toLowerCase()
-    if (!clean) return software
-
-    return software.filter((item) =>
-      [item.name, item.version, item.publisher]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(clean),
+  const [command, setCommand] =
+    useState<AgentCommandType>(
+      'sfc_verify',
     )
-  }, [query, software])
+  const [reason, setReason] =
+    useState('')
 
-  return (
-    <FormModal
-      open
-      title="Programas instalados"
-      description={`${software.length} programas identificados no último inventário.`}
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-10 rounded-xl bg-slate-950 px-4 text-xs font-bold text-white"
-          >
-            Fechar
-          </button>
-        </div>
-      }
-    >
-      <div className="space-y-3">
-        <div className="relative">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar programa, versão ou fabricante"
-            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-          />
-        </div>
+  const selected =
+    actionOptions.find(
+      (item) =>
+        item.value === command,
+    )
 
-        <div className="max-h-[55vh] overflow-y-auto rounded-xl border border-slate-200">
-          {filtered.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400">
-              Nenhum programa encontrado.
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {filtered.map((item, index) => (
-                <div
-                  key={`${item.name}-${item.version}-${item.publisher}-${index}`}
-                  className="grid gap-1 px-3 py-2.5 sm:grid-cols-[1fr_130px]"
-                >
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold text-slate-800">
-                      {item.name}
-                    </div>
-                    <div className="mt-0.5 text-[9px] text-slate-400">
-                      {item.publisher || 'Fabricante não informado'}
-                    </div>
-                  </div>
-                  <div className="text-[10px] font-medium text-slate-500 sm:text-right">
-                    {item.version || 'Versão não informada'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </FormModal>
-  )
-}
+  async function submit() {
+    try {
+      onBusy(true)
+      onError(null)
 
-function EnrollmentModal({
-  token,
-  onClose,
-}: {
-  token: string
-  onClose: () => void
-}) {
-  const [copied, setCopied] = useState(false)
+      await queueAgentCommand({
+        assetId,
+        commandType: command,
+        reason,
+      })
 
-  async function copyToken() {
-    await navigator.clipboard.writeText(token)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1500)
+      setReason('')
+      await onQueued()
+    } catch (error) {
+      onError(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível colocar a ação na fila.',
+      )
+    } finally {
+      onBusy(false)
+    }
   }
 
   return (
     <FormModal
-      open
-      title="Credencial do agente"
-      description="Use o instalador gráfico do Wisdom TI na máquina correspondente."
+      open={open}
+      title="Manutenção remota"
+      description="Somente operações pré-definidas e auditadas podem ser executadas pelo agente."
       onClose={onClose}
       footer={
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="h-10 rounded-xl bg-slate-950 px-4 text-xs font-bold text-white"
+            className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600"
           >
-            Concluir
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={
+              busy ||
+              reason.trim().length < 5
+            }
+            onClick={() =>
+              void submit()
+            }
+            className="h-10 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40"
+          >
+            Enviar para a máquina
           </button>
         </div>
       }
     >
       <div className="space-y-4">
-        <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-800">
-          Instalação simplificada: leve o arquivo <strong>WisdomTI-Agent-Setup.exe</strong>{' '}
-          para o computador, dê dois cliques, cole este token e clique em Instalar.
-          Não é necessário abrir PowerShell.
-        </div>
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-bold text-slate-700">
+            Ação
+          </span>
+          <select
+            value={command}
+            onChange={(event) =>
+              setCommand(
+                event.target
+                  .value as AgentCommandType,
+              )
+            }
+            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+          >
+            {actionOptions.map(
+              (item) => (
+                <option
+                  key={item.value}
+                  value={item.value}
+                >
+                  {item.label}
+                </option>
+              ),
+            )}
+          </select>
+        </label>
 
-        <div>
-          <div className="mb-1.5 text-xs font-semibold text-slate-700">
-            Token desta máquina
-          </div>
-          <div className="flex gap-2">
-            <code className="min-w-0 flex-1 overflow-x-auto rounded-xl bg-slate-950 p-3 text-[10px] text-white">
-              {token}
-            </code>
-            <button
-              type="button"
-              onClick={() => void copyToken()}
-              className="grid size-10 shrink-0 place-items-center rounded-xl border border-slate-200"
-              aria-label="Copiar token"
-            >
-              <Copy size={14} />
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
-          O token é exibido uma única vez e identifica somente este agente.
-          Se houver exposição, use Rotacionar token.
-        </div>
-
-        {copied && (
-          <div className="text-xs font-semibold text-emerald-600">
-            Token copiado.
+        {selected && (
+          <div
+            className={`rounded-xl border p-3 text-xs leading-5 ${
+              selected.risk ===
+              'maintenance'
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-sky-200 bg-sky-50 text-sky-800'
+            }`}
+          >
+            {selected.description}
           </div>
         )}
+
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-bold text-slate-700">
+            Motivo / contexto
+          </span>
+          <textarea
+            value={reason}
+            onChange={(event) =>
+              setReason(
+                event.target.value,
+              )
+            }
+            placeholder="Ex.: chamado CHM-2026-000012 apresenta lentidão e reinicializações."
+            className="min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-400"
+          />
+        </label>
       </div>
     </FormModal>
   )
@@ -787,85 +1384,157 @@ function EnrollmentModal({
 
 function RevokeModal({
   agent,
+  busy,
   onClose,
-  onDone,
+  onConfirm,
 }: {
-  agent: AgentDeviceRecord
+  agent: AgentDeviceRecord | null
+  busy: boolean
   onClose: () => void
-  onDone: () => void
+  onConfirm: (
+    reason: string,
+  ) => Promise<void>
 }) {
-  const [reason, setReason] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
-  async function submit() {
-    if (!reason.trim()) {
-      setErrorMessage('Informe o motivo da revogação.')
-      return
-    }
-
-    try {
-      setSaving(true)
-      setErrorMessage(null)
-      await revokeAgent(agent.id, reason)
-      onDone()
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível revogar o agente.',
-      )
-    } finally {
-      setSaving(false)
-    }
-  }
+  const [reason, setReason] =
+    useState('')
 
   return (
     <FormModal
-      open
+      open={Boolean(agent)}
       title="Revogar agente"
-      description="A credencial deixa de aceitar novas coletas imediatamente."
+      description="A máquina deixará de conseguir enviar inventário ou receber ações remotas."
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-600"
+            className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-semibold"
           >
             Cancelar
           </button>
           <button
             type="button"
-            onClick={() => void submit()}
-            disabled={saving}
-            className="h-10 rounded-xl bg-red-600 px-4 text-xs font-bold text-white disabled:opacity-50"
+            disabled={
+              busy ||
+              reason.trim().length < 5
+            }
+            onClick={() =>
+              void onConfirm(
+                reason,
+              )
+            }
+            className="h-10 rounded-xl bg-red-600 px-4 text-sm font-bold text-white disabled:opacity-40"
           >
-            {saving ? 'Revogando...' : 'Revogar'}
+            Revogar
           </button>
         </div>
       }
     >
-      <div className="space-y-3">
-        {errorMessage && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-            {errorMessage}
-          </div>
-        )}
+      <label className="block">
+        <span className="mb-1.5 block text-xs font-bold text-slate-700">
+          Justificativa
+        </span>
         <textarea
           value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          className="min-h-28 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-          placeholder="Motivo da revogação"
+          onChange={(event) =>
+            setReason(
+              event.target.value,
+            )
+          }
+          className="min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
         />
+      </label>
+    </FormModal>
+  )
+}
+
+function SoftwareModal({
+  open,
+  software,
+  onClose,
+}: {
+  open: boolean
+  software:
+    AgentInventorySnapshotRecord['software']
+  onClose: () => void
+}) {
+  const [search, setSearch] =
+    useState('')
+
+  const filtered = software.filter(
+    (item) =>
+      `${item.name ?? ''} ${item.publisher ?? ''}`
+        .toLowerCase()
+        .includes(
+          search
+            .trim()
+            .toLowerCase(),
+        ),
+  )
+
+  return (
+    <FormModal
+      open={open}
+      title="Programas instalados"
+      description={`${software.length} programas identificados na última coleta.`}
+      onClose={onClose}
+      footer={
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-10 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white"
+        >
+          Concluir
+        </button>
+      }
+    >
+      <input
+        value={search}
+        onChange={(event) =>
+          setSearch(
+            event.target.value,
+          )
+        }
+        placeholder="Buscar programa"
+        className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+      />
+
+      <div className="max-h-[50vh] divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200">
+        {filtered.map(
+          (item, index) => (
+            <div
+              key={`${item.name}-${index}`}
+              className="px-3 py-2.5"
+            >
+              <div className="text-xs font-bold text-slate-800">
+                {item.name}
+              </div>
+              <div className="mt-0.5 text-[10px] text-slate-400">
+                {[
+                  item.version,
+                  item.publisher,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+            </div>
+          ),
+        )}
       </div>
     </FormModal>
   )
 }
 
-function Spec({ label, value }: { label: string; value: string }) {
+function Spec({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
   return (
-    <div className="rounded-lg bg-slate-50 p-2.5">
+    <div className="rounded-xl bg-slate-50 px-3 py-2.5">
       <div className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400">
         {label}
       </div>
@@ -876,12 +1545,23 @@ function Spec({ label, value }: { label: string; value: string }) {
   )
 }
 
-function formatBytes(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return '0 GB'
+function formatBytes(
+  bytes: number,
+) {
+  if (!Number.isFinite(bytes)) {
+    return '—'
+  }
 
-  const gb = value / 1024 / 1024 / 1024
-  if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 0 : 1)} GB`
+  if (bytes >=
+    1024 ** 3) {
+    return `${(
+      bytes /
+      1024 ** 3
+    ).toFixed(1)} GB`
+  }
 
-  const mb = value / 1024 / 1024
-  return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`
+  return `${(
+    bytes /
+    1024 ** 2
+  ).toFixed(0)} MB`
 }

@@ -1,6 +1,34 @@
-export type AgentStatus = 'active' | 'revoked'
-export type AlertSeverity = 'info' | 'warning' | 'critical'
-export type AlertStatus = 'open' | 'acknowledged' | 'resolved'
+export type AgentStatus =
+  | 'active'
+  | 'revoked'
+
+export type AlertSeverity =
+  | 'info'
+  | 'warning'
+  | 'critical'
+
+export type AlertStatus =
+  | 'open'
+  | 'acknowledged'
+  | 'resolved'
+
+export type AgentCommandType =
+  | 'collect_inventory'
+  | 'collect_diagnostics'
+  | 'sfc_verify'
+  | 'sfc_scannow'
+  | 'dism_scanhealth'
+  | 'dism_restorehealth'
+  | 'flush_dns'
+  | 'cleanup_temp'
+  | 'optimize_system_drive'
+
+export type AgentCommandStatus =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
 
 export interface AgentDeviceRecord {
   id: string
@@ -18,6 +46,69 @@ export interface AgentDeviceRecord {
   updated_at: string
   revoked_at: string | null
   revoke_reason: string | null
+}
+
+export interface AgentMemoryModule {
+  bank?: string
+  slot?: string
+  manufacturer?: string
+  part_number?: string
+  serial_number?: string
+  capacity_bytes?: number
+  speed_mhz?: number
+  configured_speed_mhz?: number
+  memory_type?: string
+}
+
+export interface AgentPhysicalDisk {
+  friendly_name?: string
+  model?: string
+  serial_number?: string
+  media_type?: string
+  bus_type?: string
+  health_status?: string
+  operational_status?: string
+  size_bytes?: number
+  temperature_c?: number
+  wear_percent?: number
+  read_errors_total?: number
+  write_errors_total?: number
+  power_on_hours?: number
+}
+
+export interface AgentNetworkAdapter {
+  name?: string
+  product_name?: string
+  manufacturer?: string
+  mac_address?: string
+  connection_id?: string
+  speed_bps?: number
+  status?: string
+  is_wifi?: boolean
+}
+
+export interface AgentDiagnostics {
+  unexpected_shutdowns_7d?: number
+  bugchecks_7d?: number
+  whea_errors_7d?: number
+  memory_diagnostic_errors_30d?: number
+  application_crashes_7d?: number
+  system_drive_free_percent?: number
+  uptime_hours?: number
+  pending_reboot?: boolean
+}
+
+export interface AgentHealthPayload {
+  collector?: string
+  motherboard?: {
+    manufacturer?: string
+    model?: string
+    serial_number?: string
+  }
+  memory_modules?: AgentMemoryModule[]
+  physical_disks?: AgentPhysicalDisk[]
+  network_adapters?: AgentNetworkAdapter[]
+  diagnostics?: AgentDiagnostics
 }
 
 export interface AgentInventorySnapshotRecord {
@@ -53,7 +144,7 @@ export interface AgentInventorySnapshotRecord {
     version?: string
     publisher?: string
   }>
-  health: Record<string, unknown>
+  health: AgentHealthPayload
 }
 
 export interface AgentDivergenceRecord {
@@ -61,7 +152,11 @@ export interface AgentDivergenceRecord {
   agent_id: string
   asset_id: string
   snapshot_id: string
-  kind: 'identity' | 'hardware' | 'software' | 'health'
+  kind:
+    | 'identity'
+    | 'hardware'
+    | 'software'
+    | 'health'
   divergence_key: string
   severity: AlertSeverity
   title: string
@@ -93,7 +188,12 @@ export interface SystemAlertRecord {
   agent_id: string | null
   asset_id: string | null
   divergence_id: string | null
-  category: 'connectivity' | 'identity' | 'hardware' | 'software' | 'health'
+  category:
+    | 'connectivity'
+    | 'identity'
+    | 'hardware'
+    | 'software'
+    | 'health'
   severity: AlertSeverity
   status: AlertStatus
   title: string
@@ -117,4 +217,36 @@ export interface AgentEnrollmentResponse {
   asset_id: string
   token: string
   token_prefix: string
+}
+
+export interface AgentActivationResponse {
+  activation_id: string
+  activation_code: string
+  expires_at: string
+  asset_id: string
+  asset_code: string
+}
+
+export interface AgentCommandRecord {
+  id: string
+  agent_id: string
+  asset_id: string
+  maintenance_id: string | null
+  command_type: AgentCommandType
+  status: AgentCommandStatus
+  parameters: Record<string, unknown>
+  reason: string
+  requested_by: string
+  requested_at: string
+  started_at: string | null
+  completed_at: string | null
+  attempt_count: number
+  max_attempts: number
+  result: {
+    success?: boolean
+    exit_code?: number
+    summary?: string
+    output?: string
+    duration_ms?: number
+  } | null
 }

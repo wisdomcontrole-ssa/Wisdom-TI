@@ -1,6 +1,8 @@
 import {
   AlertTriangle,
+  ClipboardList,
   Clock3,
+  ExternalLink,
   Plus,
   RefreshCw,
   Search,
@@ -12,7 +14,10 @@ import {
   useMemo,
   useState,
 } from 'react'
-import { Link, useNavigate } from 'react-router'
+import {
+  Link,
+  useNavigate,
+} from 'react-router'
 import { useAuth } from '../auth/useAuth'
 import { MaintenanceCreateModal } from '../components/maintenance/MaintenanceCreateModal'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -46,7 +51,10 @@ const statusTone: Record<
   cancelled: 'danger',
 }
 
-type StatusFilter = MaintenanceStatus | 'all' | 'active'
+type StatusFilter =
+  | MaintenanceStatus
+  | 'all'
+  | 'active'
 
 const activeStatuses: MaintenanceStatus[] = [
   'open',
@@ -57,25 +65,35 @@ const activeStatuses: MaintenanceStatus[] = [
 
 export function MaintenancePage() {
   const navigate = useNavigate()
-  const { access, hasPermission } = useAuth()
+  const { access, hasPermission } =
+    useAuth()
 
-  const [orders, setOrders] = useState<MaintenanceOrderRecord[]>([])
-  const [assets, setAssets] = useState<AssetRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [orders, setOrders] = useState<
+    MaintenanceOrderRecord[]
+  >([])
+  const [assets, setAssets] = useState<
+    AssetRecord[]
+  >([])
+  const [loading, setLoading] =
+    useState(true)
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<StatusFilter>('active')
-  const [createOpen, setCreateOpen] = useState(false)
+  const [status, setStatus] =
+    useState<StatusFilter>('active')
+  const [createOpen, setCreateOpen] =
+    useState(false)
 
   async function load() {
     try {
       setLoading(true)
       setErrorMessage(null)
 
-      const [orderRows, assetRows] = await Promise.all([
-        listMaintenanceOrders(),
-        listAssets(),
-      ])
+      const [orderRows, assetRows] =
+        await Promise.all([
+          listMaintenanceOrders(),
+          listAssets(),
+        ])
 
       setOrders(orderRows)
       setAssets(assetRows)
@@ -91,79 +109,64 @@ export function MaintenancePage() {
   }
 
   useEffect(() => {
-    let active = true
-
-    async function bootstrap() {
-      try {
-        const [orderRows, assetRows] = await Promise.all([
-          listMaintenanceOrders(),
-          listAssets(),
-        ])
-
-        if (!active) {
-          return
-        }
-
-        setOrders(orderRows)
-        setAssets(assetRows)
-      } catch (error) {
-        if (!active) {
-          return
-        }
-
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : 'Não foi possível carregar as manutenções.',
-        )
-      } finally {
-        if (active) {
-          setLoading(false)
-        }
-      }
-    }
-
-    void bootstrap()
-
-    return () => {
-      active = false
-    }
+    void load()
   }, [])
 
   const assetMap = useMemo(
-    () => new Map(assets.map((asset) => [asset.id, asset])),
+    () =>
+      new Map(
+        assets.map((asset) => [
+          asset.id,
+          asset,
+        ]),
+      ),
     [assets],
   )
 
   const metrics = useMemo(() => {
-    const active = orders.filter((order) =>
-      activeStatuses.includes(order.status),
+    const active = orders.filter(
+      (order) =>
+        activeStatuses.includes(
+          order.status,
+        ),
     ).length
 
     const critical = orders.filter(
       (order) =>
-        activeStatuses.includes(order.status) &&
+        activeStatuses.includes(
+          order.status,
+        ) &&
         order.priority === 'critical',
     ).length
 
     const waiting = orders.filter(
-      (order) => order.status === 'waiting_parts',
+      (order) =>
+        order.status === 'waiting_parts',
     ).length
 
     const external = orders.filter(
-      (order) => order.status === 'external',
+      (order) =>
+        order.status === 'external',
     ).length
 
-    return { active, critical, waiting, external }
+    return {
+      active,
+      critical,
+      waiting,
+      external,
+    }
   }, [orders])
 
   const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
+    const term =
+      search.trim().toLowerCase()
 
     return orders.filter((order) => {
       if (
         status === 'active' &&
-        !activeStatuses.includes(order.status)
+        !activeStatuses.includes(
+          order.status,
+        )
       ) {
         return false
       }
@@ -180,7 +183,9 @@ export function MaintenancePage() {
         return true
       }
 
-      const asset = assetMap.get(order.asset_id)
+      const asset = assetMap.get(
+        order.asset_id,
+      )
 
       return [
         order.maintenance_code,
@@ -197,7 +202,12 @@ export function MaintenancePage() {
         .toLowerCase()
         .includes(term)
     })
-  }, [assetMap, orders, search, status])
+  }, [
+    assetMap,
+    orders,
+    search,
+    status,
+  ])
 
   return (
     <div className="space-y-6">
@@ -206,7 +216,30 @@ export function MaintenancePage() {
         title="Manutenções"
         description="Ordens de serviço, diagnóstico, custos, peças, evidências e ciclo de vida dos ativos."
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {hasPermission(
+              'maintenance.requests.view',
+            ) && (
+              <Link
+                to="/manutencoes/chamados"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm"
+              >
+                <ClipboardList
+                  size={15}
+                />
+                Chamados
+              </Link>
+            )}
+
+            <Link
+              to="/suporte"
+              target="_blank"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm"
+            >
+              <ExternalLink size={15} />
+              Portal público
+            </Link>
+
             <button
               type="button"
               onClick={() => void load()}
@@ -216,14 +249,22 @@ export function MaintenancePage() {
             >
               <RefreshCw
                 size={15}
-                className={loading ? 'animate-spin' : undefined}
+                className={
+                  loading
+                    ? 'animate-spin'
+                    : undefined
+                }
               />
             </button>
 
-            {hasPermission('assets.update') && (
+            {hasPermission(
+              'assets.update',
+            ) && (
               <button
                 type="button"
-                onClick={() => setCreateOpen(true)}
+                onClick={() =>
+                  setCreateOpen(true)
+                }
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white shadow-sm"
               >
                 <Plus size={15} />
@@ -247,7 +288,9 @@ export function MaintenancePage() {
           value={metrics.active}
         />
         <MetricCard
-          icon={<AlertTriangle size={16} />}
+          icon={
+            <AlertTriangle size={16} />
+          }
           label="Críticas"
           value={metrics.critical}
         />
@@ -272,7 +315,11 @@ export function MaintenancePage() {
             />
             <input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value,
+                )
+              }
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
               placeholder="Buscar ordem, patrimônio, defeito ou fornecedor"
             />
@@ -281,18 +328,37 @@ export function MaintenancePage() {
           <select
             value={status}
             onChange={(event) =>
-              setStatus(event.target.value as StatusFilter)
+              setStatus(
+                event.target
+                  .value as StatusFilter,
+              )
             }
             className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 outline-none"
           >
-            <option value="active">Manutenções ativas</option>
-            <option value="all">Todos os status</option>
-            <option value="open">Aberta</option>
-            <option value="in_progress">Em andamento</option>
-            <option value="waiting_parts">Aguardando peça</option>
-            <option value="external">Externa</option>
-            <option value="completed">Concluída</option>
-            <option value="cancelled">Cancelada</option>
+            <option value="active">
+              Manutenções ativas
+            </option>
+            <option value="all">
+              Todos os status
+            </option>
+            <option value="open">
+              Aberta
+            </option>
+            <option value="in_progress">
+              Em andamento
+            </option>
+            <option value="waiting_parts">
+              Aguardando peça
+            </option>
+            <option value="external">
+              Externa
+            </option>
+            <option value="completed">
+              Concluída
+            </option>
+            <option value="cancelled">
+              Cancelada
+            </option>
           </select>
         </div>
       </section>
@@ -304,14 +370,19 @@ export function MaintenancePage() {
               Ordens de manutenção
             </h2>
             <p className="mt-0.5 text-[11px] text-slate-400">
-              {filtered.length} registros exibidos
+              {filtered.length}{' '}
+              registros exibidos
             </p>
           </div>
         </header>
 
-        {loading && orders.length === 0 ? (
+        {loading &&
+        orders.length === 0 ? (
           <div className="flex items-center gap-3 px-5 py-10 text-sm font-semibold text-slate-400">
-            <RefreshCw size={16} className="animate-spin" />
+            <RefreshCw
+              size={16}
+              className="animate-spin"
+            />
             Carregando manutenções
           </div>
         ) : filtered.length === 0 ? (
@@ -321,7 +392,10 @@ export function MaintenancePage() {
         ) : (
           <div className="divide-y divide-slate-100">
             {filtered.map((order) => {
-              const asset = assetMap.get(order.asset_id)
+              const asset =
+                assetMap.get(
+                  order.asset_id,
+                )
 
               return (
                 <Link
@@ -331,19 +405,27 @@ export function MaintenancePage() {
                 >
                   <div>
                     <div className="font-mono text-[11px] font-black text-slate-700">
-                      {order.maintenance_code}
+                      {
+                        order.maintenance_code
+                      }
                     </div>
                     <div className="mt-1 text-[10px] text-slate-400">
-                      {new Date(order.opened_at).toLocaleDateString('pt-BR')}
+                      {new Date(
+                        order.opened_at,
+                      ).toLocaleDateString(
+                        'pt-BR',
+                      )}
                     </div>
                   </div>
 
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-[10px] font-bold text-sky-700">
-                        {asset?.asset_code ?? order.asset_id}
+                        {asset?.asset_code ??
+                          order.asset_id}
                       </span>
-                      {order.priority === 'critical' && (
+                      {order.priority ===
+                        'critical' && (
                         <span className="rounded-full bg-red-50 px-2 py-0.5 text-[9px] font-bold text-red-700">
                           CRÍTICA
                         </span>
@@ -353,14 +435,28 @@ export function MaintenancePage() {
                       {order.symptom}
                     </div>
                     <div className="mt-1 truncate text-[10px] text-slate-400">
-                      {[asset?.manufacturer, asset?.model]
+                      {[
+                        asset?.manufacturer,
+                        asset?.model,
+                      ]
                         .filter(Boolean)
-                        .join(' ') || 'Ativo controlado'}
+                        .join(' ') ||
+                        'Ativo controlado'}
                     </div>
                   </div>
 
-                  <StatusPill tone={statusTone[order.status]}>
-                    {statusLabels[order.status]}
+                  <StatusPill
+                    tone={
+                      statusTone[
+                        order.status
+                      ]
+                    }
+                  >
+                    {
+                      statusLabels[
+                        order.status
+                      ]
+                    }
                   </StatusPill>
 
                   <div className="text-left md:text-right">
@@ -368,10 +464,18 @@ export function MaintenancePage() {
                       Custos serviço
                     </div>
                     <div className="mt-1 text-sm font-bold text-slate-800">
-                      {Number(order.total_cost ?? 0).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      })}
+                      {Number(
+                        order.total_cost ??
+                          0,
+                      ).toLocaleString(
+                        'pt-BR',
+                        {
+                          style:
+                            'currency',
+                          currency:
+                            'BRL',
+                        },
+                      )}
                     </div>
                   </div>
                 </Link>
@@ -384,11 +488,19 @@ export function MaintenancePage() {
       <MaintenanceCreateModal
         open={createOpen}
         assets={assets}
-        currentUserId={access?.profile.id ?? null}
-        onClose={() => setCreateOpen(false)}
-        onCreated={(maintenanceId) => {
+        currentUserId={
+          access?.profile.id ?? null
+        }
+        onClose={() =>
           setCreateOpen(false)
-          navigate(`/manutencoes/${maintenanceId}`)
+        }
+        onCreated={(
+          maintenanceId,
+        ) => {
+          setCreateOpen(false)
+          navigate(
+            `/manutencoes/${maintenanceId}`,
+          )
         }}
       />
     </div>

@@ -39,4 +39,8 @@ export type PermissionCode =
   | 'users.manage'
   | 'settings.view'
   | 'settings.manage'
+  | 'maintenance.requests.view'
+  | 'maintenance.requests.manage'
+  | 'agents.manage'
+  | 'agents.remote'
   | 'logs.view'
