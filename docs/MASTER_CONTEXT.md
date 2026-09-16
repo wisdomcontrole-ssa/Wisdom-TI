@@ -819,3 +819,10 @@ Validacoes obrigatorias desta etapa:
 - build local aprovado.
 - camera, Tesseract e motor OCR preservados sem alteracao.
 - proxima validacao: deploy da Instancia 1 e teste mobile de textos, identificacao externa/anterior e upload da logomarca.
+### Refresh PWA para branding - 2026-09-16
+
+- Diagnostico de producao confirmou que o objeto `institution/logo.png` existe, responde como PNG valido e a origem Supabase esta permitida pelo CSP.
+- A causa restante e cache antigo da PWA/service worker carregando uma revisao anterior do documento/CSP.
+- `index.html` recebeu uma revisao de deploy para alterar o precache e forcar geracao de novo service worker no build.
+- Camera, Tesseract e motor OCR permaneceram sem alteracao.
+- Validacao pendente: deploy Cloudflare e nova abertura do app para ativacao do service worker atualizado.
