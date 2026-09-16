@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace WisdomTI.Agent;
+namespace InventarioTI.Agent;
 
 internal sealed class AgentConfig
 {
@@ -160,6 +160,18 @@ internal sealed class SoftwareInfo
 
     [JsonPropertyName("publisher")]
     public string? Publisher { get; set; }
+
+    [JsonPropertyName("uninstall_id")]
+    public string? UninstallId { get; set; }
+
+    [JsonPropertyName("uninstall_scope")]
+    public string? UninstallScope { get; set; }
+
+    [JsonPropertyName("uninstall_method")]
+    public string? UninstallMethod { get; set; }
+
+    [JsonPropertyName("uninstall_eligible")]
+    public bool UninstallEligible { get; set; }
 }
 
 internal sealed class ClaimActivationRequest

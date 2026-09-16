@@ -22,6 +22,7 @@ export type AgentCommandType =
   | 'flush_dns'
   | 'cleanup_temp'
   | 'optimize_system_drive'
+  | 'uninstall_software'
 
 export type AgentCommandStatus =
   | 'queued'
@@ -143,6 +144,14 @@ export interface AgentInventorySnapshotRecord {
     name?: string
     version?: string
     publisher?: string
+    uninstall_id?: string
+    uninstall_scope?:
+      | 'machine'
+      | 'user'
+    uninstall_method?:
+      | 'msi'
+      | 'quiet'
+    uninstall_eligible?: boolean
   }>
   health: AgentHealthPayload
 }
@@ -249,4 +258,13 @@ export interface AgentCommandRecord {
     output?: string
     duration_ms?: number
   } | null
+}
+
+export interface AssetRemoteAccessRecord {
+  asset_id: string
+  provider: 'meshcentral'
+  device_id: string | null
+  connect_url: string | null
+  active: boolean
+  updated_at: string
 }

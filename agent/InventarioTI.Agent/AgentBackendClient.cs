@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
-namespace WisdomTI.Agent;
+namespace InventarioTI.Agent;
 
 internal sealed class AgentBackendClient
 {
@@ -23,7 +23,7 @@ internal sealed class AgentBackendClient
         };
 
         _client.DefaultRequestHeaders.UserAgent.ParseAdd(
-            $"WisdomTI-Agent/{Program.AgentVersion}");
+            $"InventarioTI-Agent/{Program.AgentVersion}");
     }
 
     public async Task UploadInventoryAsync(

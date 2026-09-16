@@ -51,9 +51,19 @@ export function PublicSupportPage() {
   const [requesterName, setRequesterName] =
     useState('')
   const [
-    requesterContact,
-    setRequesterContact,
+    requesterEmail,
+    setRequesterEmail,
   ] = useState('')
+  const [
+    requesterWhatsapp,
+    setRequesterWhatsapp,
+  ] = useState('')
+  const [notifyEmail, setNotifyEmail] =
+    useState(true)
+  const [
+    notifyWhatsapp,
+    setNotifyWhatsapp,
+  ] = useState(true)
   const [
     originOrganization,
     setOriginOrganization,
@@ -157,7 +167,13 @@ export function PublicSupportPage() {
     if (step === 0) {
       return (
         requesterName.trim().length >= 3 &&
-        requesterContact.trim().length >= 5 &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+          requesterEmail.trim(),
+        ) &&
+        requesterWhatsapp.replace(
+          /\D/g,
+          '',
+        ).length >= 10 &&
         originUnit.trim().length >= 2
       )
     }
@@ -193,8 +209,9 @@ export function PublicSupportPage() {
     completedChecks.length,
     equipmentItems.length,
     originUnit,
-    requesterContact,
+    requesterEmail,
     requesterName,
+    requesterWhatsapp,
     step,
     topic,
   ])
@@ -209,7 +226,10 @@ export function PublicSupportPage() {
       const result =
         await createPublicMaintenanceRequest({
           requesterName,
-          requesterContact,
+          requesterEmail,
+          requesterWhatsapp,
+          notifyEmail,
+          notifyWhatsapp,
           originOrganization,
           originUnit,
           originEnvironment,
@@ -340,16 +360,34 @@ export function PublicSupportPage() {
                 />
               </Field>
 
-              <Field label="Contato">
+              <Field label="E-mail">
                 <input
                   className={inputClass}
-                  value={requesterContact}
+                  type="email"
+                  autoComplete="email"
+                  value={requesterEmail}
                   onChange={(event) =>
-                    setRequesterContact(
+                    setRequesterEmail(
                       event.target.value,
                     )
                   }
-                  placeholder="Telefone, WhatsApp ou e-mail"
+                  placeholder="nome@exemplo.com"
+                />
+              </Field>
+
+              <Field label="WhatsApp">
+                <input
+                  className={inputClass}
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={requesterWhatsapp}
+                  onChange={(event) =>
+                    setRequesterWhatsapp(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="(00) 00000-0000"
                 />
               </Field>
 
@@ -392,6 +430,41 @@ export function PublicSupportPage() {
                     placeholder="Opcional"
                   />
                 </Field>
+              </div>
+
+              <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs font-black text-slate-700">
+                  Atualizações do atendimento
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-start gap-3 text-xs font-semibold leading-5 text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={notifyEmail}
+                      onChange={(event) =>
+                        setNotifyEmail(
+                          event.target.checked,
+                        )
+                      }
+                      className="mt-0.5 size-4 rounded border-slate-300"
+                    />
+                    Quero receber atualizações por e-mail.
+                  </label>
+
+                  <label className="flex items-start gap-3 text-xs font-semibold leading-5 text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={notifyWhatsapp}
+                      onChange={(event) =>
+                        setNotifyWhatsapp(
+                          event.target.checked,
+                        )
+                      }
+                      className="mt-0.5 size-4 rounded border-slate-300"
+                    />
+                    Autorizo contato e atualizações pelo WhatsApp.
+                  </label>
+                </div>
               </div>
 
               <div
@@ -486,8 +559,8 @@ export function PublicSupportPage() {
                     <option value="unknown">
                       Não sei / não possui
                     </option>
-                    <option value="wisdom">
-                      Código interno Wisdom
+                    <option value="internal">
+                      Código interno do patrimônio
                     </option>
                     <option value="patrimony">
                       Patrimônio / tombamento externo

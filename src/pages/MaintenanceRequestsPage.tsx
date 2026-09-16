@@ -2,6 +2,8 @@ import {
   CheckCircle2,
   ExternalLink,
   Link2,
+  Mail,
+  MessageCircle,
   PackageCheck,
   RefreshCw,
   Search,
@@ -29,6 +31,7 @@ import {
   type MaintenanceRequestRecord,
   type MaintenanceRequestStatus,
 } from '../data/maintenance-request-service'
+import { buildMaintenanceWhatsAppUrl } from '../data/maintenance-notification-service'
 import type {
   AssetRecord,
 } from '../types/assets'
@@ -153,6 +156,8 @@ export function MaintenanceRequestsPage() {
         request.request_code,
         request.requester_name,
         request.requester_contact,
+        request.requester_email,
+        request.requester_whatsapp,
         request.origin_organization,
         request.origin_unit,
         request.origin_environment,
@@ -443,11 +448,19 @@ export function MaintenanceRequestsPage() {
                   {request.summary_text}
                 </p>
 
-                <div className="mt-4 grid gap-3 text-xs sm:grid-cols-3">
+                <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
                   <Info
-                    label="Contato"
+                    label="E-mail"
                     value={
-                      request.requester_contact
+                      request.requester_email ??
+                      'Não informado'
+                    }
+                  />
+                  <Info
+                    label="WhatsApp"
+                    value={
+                      request.requester_whatsapp ??
+                      'Não informado'
                     }
                   />
                   <Info
@@ -467,6 +480,40 @@ export function MaintenanceRequestsPage() {
                       .filter(Boolean)
                       .join(' ')}
                   />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {request.notify_email &&
+                    request.requester_email && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700">
+                        <Mail size={12} />
+                        Atualizações por e-mail
+                      </span>
+                    )}
+
+                  {request.notify_whatsapp &&
+                    request.requester_whatsapp &&
+                    (() => {
+                      const url =
+                        buildMaintenanceWhatsAppUrl(
+                          request.requester_whatsapp,
+                          `Olá ${request.requester_name}. Atualização do chamado ${request.request_code}: ${statusLabels[request.status]}.`,
+                        )
+
+                      return url ? (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700"
+                        >
+                          <MessageCircle
+                            size={12}
+                          />
+                          Enviar WhatsApp
+                        </a>
+                      ) : null
+                    })()}
                 </div>
 
                 <div className="mt-5 grid gap-3 border-t border-slate-100 pt-4 lg:grid-cols-3">

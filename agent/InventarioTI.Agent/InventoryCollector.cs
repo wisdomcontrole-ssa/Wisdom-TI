@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 
-namespace WisdomTI.Agent;
+namespace InventarioTI.Agent;
 
 internal static class InventoryCollector
 {
@@ -157,21 +157,57 @@ $networkAdapters = @(
 )
 
 $softwareRows = New-Object System.Collections.Generic.List[object]
-$paths = @(
-    'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
-    'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
-    'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+
+$softwareRoots = @(
+    @{
+        path = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+        prefix = 'HKLM64'
+        scope = 'machine'
+    },
+    @{
+        path = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+        prefix = 'HKLM32'
+        scope = 'machine'
+    },
+    @{
+        path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+        prefix = 'HKCU'
+        scope = 'user'
+    }
 )
 
-foreach ($path in $paths) {
-    Get-ItemProperty $path -ErrorAction SilentlyContinue |
+foreach ($root in $softwareRoots) {
+    Get-ItemProperty $root.path -ErrorAction SilentlyContinue |
         Where-Object { $_.DisplayName } |
         ForEach-Object {
+            $keyName = [string]$_.PSChildName
+            $quiet = ([string]$_.QuietUninstallString).Trim()
+            $windowsInstaller = ([int]$_.WindowsInstaller -eq 1)
+            $guidLike = $keyName -match '^\{[0-9A-Fa-f-]{36}\}$'
+            $quietBlocked =
+                $quiet -match '(?i)(^|["\s])(cmd|powershell|pwsh|wscript|cscript|mshta|rundll32)\.exe(\s|$)'
+
+            $method = $null
+            $eligible = $false
+
+            if ($windowsInstaller -and $guidLike) {
+                $method = 'msi'
+                $eligible = $true
+            }
+            elseif ($quiet -and -not $quietBlocked) {
+                $method = 'quiet'
+                $eligible = $true
+            }
+
             $softwareRows.Add(
                 [pscustomobject]@{
                     name = [string]$_.DisplayName
                     version = [string]$_.DisplayVersion
                     publisher = [string]$_.Publisher
+                    uninstall_id = "$($root.prefix)|$keyName"
+                    uninstall_scope = [string]$root.scope
+                    uninstall_method = $method
+                    uninstall_eligible = [bool]$eligible
                 }
             )
         }
@@ -295,7 +331,7 @@ $result = [pscustomobject]@{
     disks = $logicalDisks
     software = $software
     health = [pscustomobject]@{
-        collector = 'powershell-cim-v2'
+        collector = 'powershell-cim-v2.1'
         motherboard = [pscustomobject]@{
             manufacturer = [string]$board.Manufacturer
             model = [string]$board.Product

@@ -9,6 +9,7 @@ import type {
   AgentEnrollmentResponse,
   AgentInventorySnapshotRecord,
   AlertStatus,
+  AssetRemoteAccessRecord,
   InventoryExpectationRecord,
   SystemAlertRecord,
 } from '../types/agent'
@@ -279,7 +280,7 @@ export async function downloadAgentInstaller(
   activationCode: string,
 ) {
   const response = await fetch(
-    '/downloads/WisdomTI-Agent-Setup.exe',
+    '/downloads/InventarioTI-Agent-Setup.exe',
     {
       cache: 'no-store',
     },
@@ -298,7 +299,7 @@ export async function downloadAgentInstaller(
 
   anchor.href = url
   anchor.download =
-    `WisdomTI-Agent-${activationCode}.exe`
+    `InventarioTI-Agent-${activationCode}.exe`
 
   document.body.appendChild(anchor)
   anchor.click()
@@ -351,4 +352,59 @@ export async function adoptDetectedInventory(
   throwIfError(error)
 
   return data as InventoryExpectationRecord
+}
+
+export async function getAssetRemoteAccess(
+  assetId: string,
+) {
+  const { data, error } = await client()
+    .from('asset_remote_access')
+    .select(
+      'asset_id, provider, device_id, connect_url, active, updated_at',
+    )
+    .eq('asset_id', assetId)
+    .maybeSingle()
+
+  throwIfError(error)
+
+  return data as
+    | AssetRemoteAccessRecord
+    | null
+}
+
+export async function setAssetRemoteAccess(
+  assetId: string,
+  input: {
+    deviceId?: string
+    connectUrl: string
+  },
+) {
+  const { data, error } = await client().rpc(
+    'set_asset_remote_access',
+    {
+      p_asset_id: assetId,
+      p_provider: 'meshcentral',
+      p_device_id:
+        input.deviceId?.trim() || null,
+      p_connect_url:
+        input.connectUrl.trim(),
+    },
+  )
+
+  throwIfError(error)
+  return data as AssetRemoteAccessRecord
+}
+
+export async function clearAssetRemoteAccess(
+  assetId: string,
+) {
+  const { data, error } = await client().rpc(
+    'clear_asset_remote_access',
+    {
+      p_asset_id: assetId,
+    },
+  )
+
+  throwIfError(error)
+  return data
 }

@@ -2,14 +2,14 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 
-namespace WisdomTI.Agent;
+namespace InventarioTI.Agent;
 
 internal static class AgentInstaller
 {
     private const string EndpointTask =
-        "Wisdom TI Agent - Endpoint";
+        "Inventario TI Agent - Endpoint";
     private const string StartupTask =
-        "Wisdom TI Agent - Endpoint Startup";
+        "Inventario TI Agent - Endpoint Startup";
 
     public static async Task<int> InstallAsync(
         string activationCode,
@@ -150,7 +150,7 @@ internal static class AgentInstaller
                 $"Primeira coleta retornou {firstRun.ExitCode}: {firstRun.Error}");
 
             NativeUi.Show(
-                "Wisdom TI Agent",
+                "Inventário TI Agent",
                 "O agente foi instalado e será executado automaticamente, " +
                 "mas a primeira coleta não foi concluída.\n\n" +
                 $"Patrimônio: {claim.AssetCode}\n" +
@@ -159,7 +159,7 @@ internal static class AgentInstaller
         }
 
         NativeUi.Show(
-            "Wisdom TI Agent",
+            "Inventário TI Agent",
             "Instalação concluída com sucesso.\n\n" +
             $"Patrimônio: {claim.AssetCode}\n" +
             "O inventário e os diagnósticos serão enviados automaticamente.");
@@ -172,7 +172,7 @@ internal static class AgentInstaller
         using var stream =
             Assembly.GetExecutingAssembly()
                 .GetManifestResourceStream(
-                    "WisdomTI.Agent.InstanceConfig.json")
+                    "InventarioTI.Agent.InstanceConfig.json")
             ?? throw new InvalidOperationException(
                 "Configuração da instância ausente no instalador.");
 
@@ -228,6 +228,72 @@ internal static class AgentInstaller
         {
             start.ArgumentList.Add(argument);
         }
+
+        using var process =
+            Process.Start(start)
+            ?? throw new InvalidOperationException(
+                $"Não foi possível iniciar {fileName}.");
+
+        using var cts =
+            new CancellationTokenSource(
+                timeout ??
+                TimeSpan.FromMinutes(15));
+
+        var stdoutTask =
+            process.StandardOutput.ReadToEndAsync();
+        var stderrTask =
+            process.StandardError.ReadToEndAsync();
+
+        try
+        {
+            await process.WaitForExitAsync(
+                cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                process.Kill(
+                    entireProcessTree: true);
+            }
+            catch
+            {
+                // Best effort.
+            }
+
+            return new ProcessResult
+            {
+                ExitCode = -2,
+                Output = await stdoutTask,
+                Error =
+                    "Tempo limite excedido.",
+            };
+        }
+
+        return new ProcessResult
+        {
+            ExitCode = process.ExitCode,
+            Output = await stdoutTask,
+            Error = await stderrTask,
+        };
+    }
+
+    internal static async Task<ProcessResult>
+        RunProcessRawAsync(
+            string fileName,
+            string arguments,
+            TimeSpan? timeout = null)
+    {
+        var start =
+            new ProcessStartInfo
+            {
+                FileName = fileName,
+                Arguments = arguments,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
 
         using var process =
             Process.Start(start)

@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace WisdomTI.Agent;
+namespace InventarioTI.Agent;
 
 internal static class NativeUi
 {

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { triggerMaintenanceNotifications } from './maintenance-notification-service'
 import type {
   AssetDisposalRecord,
   AssetLifecycleEventRecord,
@@ -29,6 +30,12 @@ function throwIfError(error: { message: string } | null) {
 
 function unwrapRpcRow<T>(data: T | T[]) {
   return Array.isArray(data) ? data[0] : data
+}
+
+async function notifyMaintenance(maintenanceId: string) {
+  await triggerMaintenanceNotifications({
+    maintenanceId,
+  })
 }
 
 const orderSelect =
@@ -148,11 +155,21 @@ export async function createMaintenanceOrder(
 
   throwIfError(error)
 
-  const row = unwrapRpcRow(data as Record<string, unknown> | Record<string, unknown>[])
+  const row = unwrapRpcRow(
+    data as
+      | Record<string, unknown>
+      | Record<string, unknown>[],
+  )
 
   if (!row?.maintenance_id) {
-    throw new Error('A manutenção foi criada sem retorno de identificação.')
+    throw new Error(
+      'A manutenção foi criada sem retorno de identificação.',
+    )
   }
+
+  await notifyMaintenance(
+    row.maintenance_id as string,
+  )
 
   return row as {
     maintenance_id: string
@@ -209,7 +226,13 @@ export async function updateMaintenanceOrder(
   )
 
   throwIfError(error)
-  return unwrapRpcRow(data as MaintenanceOrderRecord | MaintenanceOrderRecord[]) as MaintenanceOrderRecord
+  await notifyMaintenance(input.maintenanceId)
+
+  return unwrapRpcRow(
+    data as
+      | MaintenanceOrderRecord
+      | MaintenanceOrderRecord[],
+  ) as MaintenanceOrderRecord
 }
 
 export async function addMaintenancePart(input: {
@@ -233,7 +256,13 @@ export async function addMaintenancePart(input: {
   )
 
   throwIfError(error)
-  return unwrapRpcRow(data as MaintenancePartRecord | MaintenancePartRecord[]) as MaintenancePartRecord
+  await notifyMaintenance(input.maintenanceId)
+
+  return unwrapRpcRow(
+    data as
+      | MaintenancePartRecord
+      | MaintenancePartRecord[],
+  ) as MaintenancePartRecord
 }
 
 export async function removeMaintenancePart(
@@ -249,7 +278,20 @@ export async function removeMaintenancePart(
   )
 
   throwIfError(error)
-  return unwrapRpcRow(data as MaintenancePartRecord | MaintenancePartRecord[]) as MaintenancePartRecord
+
+  const result = unwrapRpcRow(
+    data as
+      | MaintenancePartRecord
+      | MaintenancePartRecord[],
+  ) as MaintenancePartRecord
+
+  if (result?.maintenance_id) {
+    await notifyMaintenance(
+      result.maintenance_id,
+    )
+  }
+
+  return result
 }
 
 export async function completeMaintenanceOrder(input: {
@@ -271,7 +313,13 @@ export async function completeMaintenanceOrder(input: {
   )
 
   throwIfError(error)
-  return unwrapRpcRow(data as MaintenanceOrderRecord | MaintenanceOrderRecord[]) as MaintenanceOrderRecord
+  await notifyMaintenance(input.maintenanceId)
+
+  return unwrapRpcRow(
+    data as
+      | MaintenanceOrderRecord
+      | MaintenanceOrderRecord[],
+  ) as MaintenanceOrderRecord
 }
 
 export async function cancelMaintenanceOrder(
@@ -287,14 +335,26 @@ export async function cancelMaintenanceOrder(
   )
 
   throwIfError(error)
-  return unwrapRpcRow(data as MaintenanceOrderRecord | MaintenanceOrderRecord[]) as MaintenanceOrderRecord
+  await notifyMaintenance(maintenanceId)
+
+  return unwrapRpcRow(
+    data as
+      | MaintenanceOrderRecord
+      | MaintenanceOrderRecord[],
+  ) as MaintenanceOrderRecord
 }
 
-export async function retireAsset(assetId: string, reason: string) {
-  const { data, error } = await client().rpc('retire_asset', {
-    p_asset_id: assetId,
-    p_reason: reason.trim(),
-  })
+export async function retireAsset(
+  assetId: string,
+  reason: string,
+) {
+  const { data, error } = await client().rpc(
+    'retire_asset',
+    {
+      p_asset_id: assetId,
+      p_reason: reason.trim(),
+    },
+  )
 
   throwIfError(error)
   return data
@@ -309,15 +369,22 @@ export async function disposeAsset(input: {
   residualValue?: number | null
   notes?: string
 }) {
-  const { data, error } = await client().rpc('dispose_asset', {
-    p_asset_id: input.assetId,
-    p_reason_category: input.reasonCategory,
-    p_disposal_method: input.disposalMethod,
-    p_reason: input.reason.trim(),
-    p_destination: input.destination?.trim() || null,
-    p_residual_value: input.residualValue ?? null,
-    p_notes: input.notes?.trim() || null,
-  })
+  const { data, error } = await client().rpc(
+    'dispose_asset',
+    {
+      p_asset_id: input.assetId,
+      p_reason_category:
+        input.reasonCategory,
+      p_disposal_method:
+        input.disposalMethod,
+      p_reason: input.reason.trim(),
+      p_destination:
+        input.destination?.trim() || null,
+      p_residual_value:
+        input.residualValue ?? null,
+      p_notes: input.notes?.trim() || null,
+    },
+  )
 
   throwIfError(error)
   return data

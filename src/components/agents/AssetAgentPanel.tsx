@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Check,
   Download,
+  ExternalLink,
   HardDrive,
   MemoryStick,
   MonitorCog,
@@ -9,6 +10,7 @@ import {
   RefreshCw,
   RotateCw,
   ShieldOff,
+  Trash2,
   Stethoscope,
   Wrench,
   Wifi,
@@ -24,6 +26,7 @@ import {
   adoptDetectedInventory,
   createAgentActivation,
   downloadAgentInstaller,
+  getAssetRemoteAccess,
   getInventoryExpectation,
   getLatestAssetSnapshot,
   listAssetAgentCommands,
@@ -39,6 +42,7 @@ import type {
   AgentDeviceRecord,
   AgentDivergenceRecord,
   AgentInventorySnapshotRecord,
+  AssetRemoteAccessRecord,
   InventoryExpectationRecord,
 } from '../../types/agent'
 import type {
@@ -112,12 +116,19 @@ const actionOptions: Array<{
 ]
 
 const commandLabels =
-  new Map(
-    actionOptions.map((item) => [
-      item.value,
-      item.label,
-    ]),
-  )
+  new Map<AgentCommandType, string>([
+    ...actionOptions.map(
+      (item) =>
+        [item.value, item.label] as [
+          AgentCommandType,
+          string,
+        ],
+    ),
+    [
+      'uninstall_software',
+      'Desinstalar programa',
+    ],
+  ])
 
 const statusTone = {
   queued: 'info',
@@ -163,6 +174,12 @@ export function AssetAgentPanel({
     )
   const [commands, setCommands] =
     useState<AgentCommandRecord[]>([])
+  const [
+    remoteAccess,
+    setRemoteAccess,
+  ] = useState<AssetRemoteAccessRecord | null>(
+    null,
+  )
   const [loading, setLoading] =
     useState(true)
   const [online, setOnline] =
@@ -203,6 +220,9 @@ export function AssetAgentPanel({
         data.expectation,
       )
       setCommands(data.commands)
+      setRemoteAccess(
+        data.remoteAccess,
+      )
       setOnline(data.online)
     } catch (error) {
       setErrorMessage(
@@ -390,6 +410,57 @@ export function AssetAgentPanel({
         error instanceof Error
           ? error.message
           : 'Não foi possível atualizar o baseline.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function uninstallSoftware(
+    software:
+      AgentInventorySnapshotRecord['software'][number],
+  ) {
+    if (
+      !software.uninstall_eligible ||
+      !software.uninstall_id ||
+      !software.name
+    ) {
+      return
+    }
+
+    const accepted = window.confirm(
+      `Desinstalar "${software.name}" desta máquina?\n\nA ação será executada pelo agente e ficará registrada no histórico.`,
+    )
+
+    if (!accepted) {
+      return
+    }
+
+    try {
+      setBusy(true)
+      setErrorMessage(null)
+
+      await queueAgentCommand({
+        assetId: asset.id,
+        commandType:
+          'uninstall_software',
+        reason:
+          `Desinstalação remota solicitada para ${software.name}.`,
+        parameters: {
+          software_id:
+            software.uninstall_id,
+          expected_name:
+            software.name,
+        },
+      })
+
+      setSoftwareOpen(false)
+      await refresh()
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível solicitar a desinstalação.',
       )
     } finally {
       setBusy(false)
@@ -597,6 +668,42 @@ export function AssetAgentPanel({
                   </button>
                 </div>
               )}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
+                  Acesso remoto
+                </div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">
+                  Tela, teclado e mouse por sessão administrativa auditada.
+                </div>
+              </div>
+              <MonitorCog
+                size={16}
+                className="text-slate-300"
+              />
+            </div>
+
+            {remoteAccess?.active &&
+            remoteAccess.connect_url ? (
+              <a
+                href={
+                  remoteAccess.connect_url
+                }
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 text-xs font-bold text-white"
+              >
+                <ExternalLink size={13} />
+                Conectar
+              </a>
+            ) : (
+              <div className="mt-3 rounded-xl bg-slate-50 p-3 text-[11px] leading-5 text-slate-500">
+                Integração preparada. A sessão ficará disponível após configurar o servidor persistente de acesso remoto.
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border border-slate-200 p-4">
@@ -1007,6 +1114,13 @@ export function AssetAgentPanel({
       <SoftwareModal
         open={softwareOpen}
         software={sortedSoftware}
+        busy={busy}
+        canUninstall={canRemote}
+        onUninstall={(software) =>
+          void uninstallSoftware(
+            software,
+          )
+        }
         onClose={() =>
           setSoftwareOpen(false)
         }
@@ -1024,6 +1138,7 @@ async function load(
     divergences,
     expectation,
     commands,
+    remoteAccess,
   ] = await Promise.all([
     listAssetAgents(assetId),
     getLatestAssetSnapshot(assetId),
@@ -1032,6 +1147,7 @@ async function load(
     ),
     getInventoryExpectation(assetId),
     listAssetAgentCommands(assetId),
+    getAssetRemoteAccess(assetId),
   ])
 
   const activeAgent =
@@ -1056,6 +1172,7 @@ async function load(
     divergences,
     expectation,
     commands,
+    remoteAccess,
     online,
   }
 }
@@ -1452,11 +1569,20 @@ function RevokeModal({
 function SoftwareModal({
   open,
   software,
+  busy,
+  canUninstall,
+  onUninstall,
   onClose,
 }: {
   open: boolean
   software:
     AgentInventorySnapshotRecord['software']
+  busy: boolean
+  canUninstall: boolean
+  onUninstall: (
+    software:
+      AgentInventorySnapshotRecord['software'][number],
+  ) => void
   onClose: () => void
 }) {
   const [search, setSearch] =
@@ -1505,19 +1631,44 @@ function SoftwareModal({
           (item, index) => (
             <div
               key={`${item.name}-${index}`}
-              className="px-3 py-2.5"
+              className="flex items-center justify-between gap-3 px-3 py-2.5"
             >
-              <div className="text-xs font-bold text-slate-800">
-                {item.name}
+              <div className="min-w-0">
+                <div className="truncate text-xs font-bold text-slate-800">
+                  {item.name}
+                </div>
+                <div className="mt-0.5 text-[10px] text-slate-400">
+                  {[
+                    item.version,
+                    item.publisher,
+                    item.uninstall_scope ===
+                    'machine'
+                      ? 'Máquina'
+                      : item.uninstall_scope ===
+                          'user'
+                        ? 'Usuário'
+                        : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </div>
               </div>
-              <div className="mt-0.5 text-[10px] text-slate-400">
-                {[
-                  item.version,
-                  item.publisher,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
+
+              {canUninstall &&
+                item.uninstall_eligible &&
+                item.uninstall_id && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      onUninstall(item)
+                    }
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-red-200 px-2.5 text-[10px] font-bold text-red-700 disabled:opacity-40"
+                  >
+                    <Trash2 size={12} />
+                    Desinstalar
+                  </button>
+                )}
             </div>
           ),
         )}

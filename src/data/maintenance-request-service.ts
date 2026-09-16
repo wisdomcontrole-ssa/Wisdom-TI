@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { triggerMaintenanceNotifications } from './maintenance-notification-service'
 import type {
   MaintenancePriority,
 } from '../types/maintenance'
@@ -12,7 +13,7 @@ export type MaintenanceRequestStatus =
   | 'cancelled'
 
 export type MaintenanceIdentifierKind =
-  | 'wisdom'
+  | 'internal'
   | 'patrimony'
   | 'serial'
   | 'other'
@@ -24,6 +25,10 @@ export interface MaintenanceRequestRecord {
   status: MaintenanceRequestStatus
   requester_name: string
   requester_contact: string
+  requester_email: string | null
+  requester_whatsapp: string | null
+  notify_email: boolean
+  notify_whatsapp: boolean
   origin_organization: string | null
   origin_unit: string | null
   origin_environment: string | null
@@ -72,12 +77,15 @@ function throwIfError(
 }
 
 const requestSelect =
-  'id, request_code, status, requester_name, requester_contact, origin_organization, origin_unit, origin_environment, equipment_items, received_items, identifier_kind, known_identifier, manufacturer, model, serial_number, problem_category, answers, self_service_checks, self_service_completed, summary_text, requester_notes, triage_flow_version, triage_snapshot, asset_id, maintenance_id, submitted_at, received_at, received_by, converted_at, converted_by, created_at, updated_at'
+  'id, request_code, status, requester_name, requester_contact, requester_email, requester_whatsapp, notify_email, notify_whatsapp, origin_organization, origin_unit, origin_environment, equipment_items, received_items, identifier_kind, known_identifier, manufacturer, model, serial_number, problem_category, answers, self_service_checks, self_service_completed, summary_text, requester_notes, triage_flow_version, triage_snapshot, asset_id, maintenance_id, submitted_at, received_at, received_by, converted_at, converted_by, created_at, updated_at'
 
 export async function createPublicMaintenanceRequest(
   input: {
     requesterName: string
-    requesterContact: string
+    requesterEmail: string
+    requesterWhatsapp: string
+    notifyEmail: boolean
+    notifyWhatsapp: boolean
     originOrganization?: string
     originUnit: string
     originEnvironment?: string
@@ -104,7 +112,18 @@ export async function createPublicMaintenanceRequest(
         requester_name:
           input.requesterName.trim(),
         requester_contact:
-          input.requesterContact.trim(),
+          [
+            input.requesterEmail.trim(),
+            input.requesterWhatsapp.trim(),
+          ].filter(Boolean).join(' | '),
+        requester_email:
+          input.requesterEmail.trim(),
+        requester_whatsapp:
+          input.requesterWhatsapp.trim(),
+        notify_email:
+          input.notifyEmail,
+        notify_whatsapp:
+          input.notifyWhatsapp,
         origin_organization:
           input.originOrganization?.trim() ||
           null,
@@ -164,6 +183,10 @@ export async function createPublicMaintenanceRequest(
     )
   }
 
+  await triggerMaintenanceNotifications({
+    requestId: result.request_id,
+  })
+
   return {
     requestId: result.request_id,
     requestCode: result.request_code,
@@ -203,6 +226,9 @@ export async function receiveMaintenanceRequest(
   )
 
   throwIfError(error)
+  await triggerMaintenanceNotifications({
+    requestId,
+  })
   return data as MaintenanceRequestRecord
 }
 
@@ -247,6 +273,12 @@ export async function convertMaintenanceRequest(
       'A ordem de manutenção não foi criada.',
     )
   }
+
+  await triggerMaintenanceNotifications({
+    requestId,
+    maintenanceId:
+      result.maintenance_id,
+  })
 
   return {
     maintenanceId:

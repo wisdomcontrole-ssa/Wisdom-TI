@@ -1,5 +1,5 @@
 -- =====================================================================
--- WISDOM TI
+-- INVENTARIO TI
 -- OCR Intelligence - Base de apoio para interpretação de etiquetas
 -- Versão: 1.1 - correção de aliases duplicados no mesmo INSERT
 --

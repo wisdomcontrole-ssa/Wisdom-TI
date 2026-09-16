@@ -4,15 +4,15 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
-namespace WisdomTI.Agent;
+namespace InventarioTI.Agent;
 
 internal static class Program
 {
-    internal const string AgentVersion = "2.0.0";
+    internal const string AgentVersion = "2.0.1";
     internal const string ProtocolVersion = "1";
 
     private static readonly Regex ActivationPattern = new(
-        @"WT-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}",
+        @"(?:AG|WT)-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     [STAThread]
@@ -27,15 +27,14 @@ internal static class Program
                 HasArg(args, "--once") ||
                 IsInstalledExecutable(paths))
             {
-                using var mutex =
-                    new Mutex(
-                        initiallyOwned: true,
+                using var semaphore =
+                    new Semaphore(
+                        initialCount: 1,
+                        maximumCount: 1,
                         name:
-                            @"Global\WisdomTI.Agent.Endpoint",
-                        createdNew:
-                            out var ownsMutex);
+                            @"Global\InventarioTI.Agent.Endpoint");
 
-                if (!ownsMutex)
+                if (!semaphore.WaitOne(0))
                 {
                     log.Write(
                         "Outra execução do agente já está ativa.");
@@ -50,7 +49,7 @@ internal static class Program
                 }
                 finally
                 {
-                    mutex.ReleaseMutex();
+                    semaphore.Release();
                 }
             }
 
@@ -61,16 +60,16 @@ internal static class Program
             if (string.IsNullOrWhiteSpace(activationCode))
             {
                 NativeUi.Show(
-                    "Wisdom TI Agent",
+                    "Inventário TI Agent",
                     "Este instalador não possui um código de ativação.\n\n" +
-                    "Baixe o instalador diretamente pela ficha do patrimônio no Wisdom TI.");
+                    "Baixe o instalador diretamente pela ficha do patrimônio no sistema.");
                 return 2;
             }
 
             if (!IsAdministrator())
             {
                 NativeUi.Show(
-                    "Wisdom TI Agent",
+                    "Inventário TI Agent",
                     "A instalação precisa ser executada como administrador.");
                 return 3;
             }
@@ -87,7 +86,7 @@ internal static class Program
             if (!HasArg(args, "--scheduled"))
             {
                 NativeUi.Show(
-                    "Wisdom TI Agent",
+                    "Inventário TI Agent",
                     "Não foi possível concluir a operação.\n\n" +
                     ex.Message);
             }
@@ -254,9 +253,14 @@ internal static class Program
 
         if (string.IsNullOrWhiteSpace(
                 config.AgentToken) ||
-            !config.AgentToken.StartsWith(
-                "wti_",
-                StringComparison.Ordinal))
+            !(
+                config.AgentToken.StartsWith(
+                    "wti_",
+                    StringComparison.Ordinal) ||
+                config.AgentToken.StartsWith(
+                    "agt_",
+                    StringComparison.Ordinal)
+            ))
         {
             throw new InvalidOperationException(
                 "Credencial do agente inválida.");
@@ -367,7 +371,7 @@ internal sealed class AgentPaths
         var root = Path.Combine(
             Environment.GetFolderPath(
                 Environment.SpecialFolder.CommonApplicationData),
-            "WisdomTI",
+            "InventarioTI",
             "Agent");
 
         return new AgentPaths
@@ -376,7 +380,7 @@ internal sealed class AgentPaths
             InstalledExePath =
                 Path.Combine(
                     root,
-                    "WisdomTI.Agent.exe"),
+                    "InventarioTI.Agent.exe"),
             ConfigPath =
                 Path.Combine(
                     root,

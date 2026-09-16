@@ -22,9 +22,19 @@ import { useAuth } from '../auth/useAuth'
 import { MaintenanceCreateModal } from '../components/maintenance/MaintenanceCreateModal'
 import { PageHeader } from '../components/ui/PageHeader'
 import { StatusPill } from '../components/ui/StatusPill'
-import { listAssets } from '../data/asset-service'
+import {
+  listAssets,
+  listUnits,
+} from '../data/asset-service'
 import { listMaintenanceOrders } from '../data/maintenance-service'
-import type { AssetRecord } from '../types/assets'
+import {
+  listMaintenanceRequests,
+  type MaintenanceRequestRecord,
+} from '../data/maintenance-request-service'
+import type {
+  AssetRecord,
+  UnitRecord,
+} from '../types/assets'
 import type {
   MaintenanceOrderRecord,
   MaintenanceStatus,
@@ -74,6 +84,12 @@ export function MaintenancePage() {
   const [assets, setAssets] = useState<
     AssetRecord[]
   >([])
+  const [units, setUnits] = useState<
+    UnitRecord[]
+  >([])
+  const [requests, setRequests] = useState<
+    MaintenanceRequestRecord[]
+  >([])
   const [loading, setLoading] =
     useState(true)
   const [errorMessage, setErrorMessage] =
@@ -89,14 +105,22 @@ export function MaintenancePage() {
       setLoading(true)
       setErrorMessage(null)
 
-      const [orderRows, assetRows] =
-        await Promise.all([
-          listMaintenanceOrders(),
-          listAssets(),
-        ])
+      const [
+        orderRows,
+        assetRows,
+        unitRows,
+        requestRows,
+      ] = await Promise.all([
+        listMaintenanceOrders(),
+        listAssets(),
+        listUnits(),
+        listMaintenanceRequests(),
+      ])
 
       setOrders(orderRows)
       setAssets(assetRows)
+      setUnits(unitRows)
+      setRequests(requestRows)
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -121,6 +145,35 @@ export function MaintenancePage() {
         ]),
       ),
     [assets],
+  )
+
+  const unitMap = useMemo(
+    () =>
+      new Map(
+        units.map((unit) => [
+          unit.id,
+          unit,
+        ]),
+      ),
+    [units],
+  )
+
+  const requestByMaintenance = useMemo(
+    () =>
+      new Map(
+        requests
+          .filter(
+            (request) =>
+              Boolean(
+                request.maintenance_id,
+              ),
+          )
+          .map((request) => [
+            request.maintenance_id as string,
+            request,
+          ]),
+      ),
+    [requests],
   )
 
   const metrics = useMemo(() => {
@@ -186,6 +239,14 @@ export function MaintenancePage() {
       const asset = assetMap.get(
         order.asset_id,
       )
+      const request =
+        requestByMaintenance.get(order.id)
+      const unit =
+        unitMap.get(
+          order.unit_id_snapshot ??
+            asset?.current_unit_id ??
+            '',
+        )
 
       return [
         order.maintenance_code,
@@ -196,6 +257,11 @@ export function MaintenancePage() {
         asset?.manufacturer,
         asset?.model,
         asset?.serial_number,
+        request?.requester_name,
+        request?.requester_email,
+        request?.requester_whatsapp,
+        request?.origin_unit,
+        unit?.name,
       ]
         .filter(Boolean)
         .join(' ')
@@ -205,8 +271,10 @@ export function MaintenancePage() {
   }, [
     assetMap,
     orders,
+    requestByMaintenance,
     search,
     status,
+    unitMap,
   ])
 
   return (
@@ -321,7 +389,7 @@ export function MaintenancePage() {
                 )
               }
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-              placeholder="Buscar ordem, patrimônio, defeito ou fornecedor"
+              placeholder="Buscar ordem, patrimônio, responsável, unidade, defeito ou fornecedor"
             />
           </div>
 
@@ -396,6 +464,21 @@ export function MaintenancePage() {
                 assetMap.get(
                   order.asset_id,
                 )
+              const request =
+                requestByMaintenance.get(
+                  order.id,
+                )
+              const unitName =
+                request?.origin_unit ??
+                unitMap.get(
+                  order.unit_id_snapshot ??
+                    asset?.current_unit_id ??
+                    '',
+                )?.name ??
+                'Unidade não informada'
+              const responsible =
+                request?.requester_name ??
+                'Ordem interna'
 
               return (
                 <Link
@@ -442,6 +525,20 @@ export function MaintenancePage() {
                         .filter(Boolean)
                         .join(' ') ||
                         'Ativo controlado'}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-500">
+                      <span className="truncate">
+                        <strong className="font-bold text-slate-600">
+                          Unidade:
+                        </strong>{' '}
+                        {unitName}
+                      </span>
+                      <span className="truncate">
+                        <strong className="font-bold text-slate-600">
+                          Responsável:
+                        </strong>{' '}
+                        {responsible}
+                      </span>
                     </div>
                   </div>
 

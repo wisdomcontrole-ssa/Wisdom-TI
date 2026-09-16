@@ -934,3 +934,63 @@ Pendências para validação:
 6. somente depois publicar M15 + M16A na Instância 1;
 7. instalar em uma máquina piloto e validar enrollment, heartbeat, inventário e uma ação de diagnóstico;
 8. M16B: acesso remoto visual self-hosted e administração de software com regras específicas.
+
+<!-- M16B_SUPPORT_INTEGRATED_BEGIN -->
+## M16B - Suporte integrado, códigos neutros e notificações - 2026-09-16
+
+Estado: implementação local preparada para validação; após build aprovado, executar a migração M16B nos dois Supabase e validar antes de publicar.
+
+Alterações principais:
+- códigos patrimoniais novos deixam de usar prefixo institucional: `DT-000001`, `MON-000001`, etc.;
+- códigos de estoque passam a `CMP-{TIPO}-000001`;
+- códigos antigos `WIS-*` são preservados em tabelas de alias para que etiquetas, QR Codes e referências históricas continuem resolvendo;
+- portal público passa a usar a opção `Código interno do patrimônio`, sem nomenclatura institucional fixa;
+- portal passa a coletar e-mail e WhatsApp separadamente, com preferências de notificação;
+- lista de ordens de manutenção passa a mostrar unidade e responsável/solicitante;
+- eventos do chamado e alterações da ordem geram outbox de notificações;
+- e-mail automático é preparado por Edge Function `maintenance-notify` + Google Apps Script `MailApp`, sem API comercial paga;
+- WhatsApp fica como canal manual assistido por link pré-preenchido, sem credenciais ou APIs comerciais no frontend;
+- agente Windows evolui para 2.0.1 e corrige a falha de sincronização do Mutex usando semáforo nomeado;
+- nome visível do pacote passa a `InventarioTI-Agent-Setup.exe` e código de ativação a `AG-XXXX-XXXX-XXXX`;
+- o código de ativação novo passa a `AG-*`; o token técnico legado `wti_` permanece temporariamente somente na autenticação interna do agente para compatibilidade com o `agent-ingest`, sem exposição na interface;
+- inventário de software passa a guardar ID estável de desinstalação, escopo e elegibilidade;
+- desinstalação remota só executa MSI ou `QuietUninstallString` registrados pelo Windows; comandos arbitrários e interpretadores são bloqueados;
+- acesso remoto visual usa integração preparada para MeshCentral self-hosted; a sessão só ficará operacional após definição de um servidor persistente/relay e vínculo do dispositivo.
+
+Banco/Migrações:
+- `asset_code_aliases`;
+- `stock_code_aliases`;
+- `maintenance_notification_outbox`;
+- `asset_remote_access`;
+- novos contatos em `maintenance_requests`;
+- `agent_commands` passa a aceitar `uninstall_software`;
+- RPCs `resolve_asset_by_code`, `set_asset_remote_access`, `clear_asset_remote_access`;
+- `register_audit_scan` passa a resolver aliases antigos de patrimônio.
+
+Variáveis/segredos esperados para envio de e-mail na Edge Function (nomes apenas):
+- `MAINTENANCE_NOTIFY_APPS_SCRIPT_URL`;
+- `MAINTENANCE_NOTIFY_SHARED_SECRET`;
+- variáveis Supabase padrão já utilizadas pelas Edge Functions.
+
+Arquivos principais:
+- `supabase/migrations/20260916183000_m16b_support_integrated.sql`;
+- `supabase/functions/maintenance-notify/index.ts`;
+- `docs/GOOGLE_APPS_SCRIPT_NOTIFICACOES_MANUTENCAO.gs`;
+- `agent/InventarioTI.Agent/*`;
+- `agent/scripts/BUILD_AGENT_PACKAGE_V3.ps1`;
+- `src/components/agents/AssetAgentPanel.tsx`;
+- `src/data/agent-service.ts`;
+- `src/data/maintenance-request-service.ts`;
+- `src/pages/MaintenancePage.tsx`;
+- `src/pages/PublicSupportPage.tsx`;
+- `src/pages/MaintenanceRequestsPage.tsx`.
+
+Pendências após validação local/banco:
+1. publicar M16B na Instância 1;
+2. reinstalar o agente piloto 2.0.1 e confirmar ausência do erro de sincronização;
+3. testar desinstalação remota primeiro em um aplicativo de teste;
+4. implantar `maintenance-notify` e configurar os dois segredos;
+5. publicar o Apps Script de e-mail e validar um chamado real;
+6. definir host persistente para MeshCentral + Cloudflare Tunnel e então concluir acesso remoto visual;
+7. somente após testes publicar na Instância 2.
+<!-- M16B_SUPPORT_INTEGRATED_END -->

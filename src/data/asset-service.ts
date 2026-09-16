@@ -30,7 +30,6 @@ export async function listAssetTypes() {
     .order('name')
 
   throwIfError(error)
-
   return (data ?? []) as AssetTypeRecord[]
 }
 
@@ -43,7 +42,6 @@ export async function listUnits() {
     .order('name')
 
   throwIfError(error)
-
   return (data ?? []) as UnitRecord[]
 }
 
@@ -56,7 +54,6 @@ export async function listEnvironments() {
     .order('name')
 
   throwIfError(error)
-
   return (data ?? []) as EnvironmentRecord[]
 }
 
@@ -70,7 +67,6 @@ export async function listAssets() {
     .limit(1000)
 
   throwIfError(error)
-
   return (data ?? []) as AssetRecord[]
 }
 
@@ -84,22 +80,28 @@ export async function getAssetById(id: string) {
     .single()
 
   throwIfError(error)
-
   return data as AssetRecord
 }
 
 export async function getAssetByCode(code: string) {
-  const { data, error } = await client()
-    .from('assets')
-    .select(
-      'id, asset_code, asset_type_id, manufacturer, model, serial_number, hostname, os_name, status, current_unit_id, current_environment_id, notes, acquired_at, created_at, updated_at',
-    )
-    .eq('asset_code', code)
-    .single()
+  const { data, error } = await client().rpc(
+    'resolve_asset_by_code',
+    {
+      p_code: code.trim(),
+    },
+  )
 
   throwIfError(error)
 
-  return data as AssetRecord
+  const result = data as {
+    asset_id?: string | null
+  } | null
+
+  if (!result?.asset_id) {
+    throw new Error('Patrimônio não encontrado.')
+  }
+
+  return getAssetById(result.asset_id)
 }
 
 export async function listAssetMovements(assetId: string) {
@@ -112,7 +114,6 @@ export async function listAssetMovements(assetId: string) {
     .order('moved_at', { ascending: false })
 
   throwIfError(error)
-
   return (data ?? []) as AssetMovementRecord[]
 }
 
@@ -126,7 +127,6 @@ export async function listRecentMovements(limit = 6) {
     .limit(limit)
 
   throwIfError(error)
-
   return (data ?? []) as AssetMovementRecord[]
 }
 
@@ -167,7 +167,6 @@ export async function createAsset(input: CreateAssetInput) {
     .single()
 
   throwIfError(error)
-
   return data as AssetRecord
 }
 
@@ -207,7 +206,6 @@ export async function updateAsset(
     .single()
 
   throwIfError(error)
-
   return data as AssetRecord
 }
 
@@ -217,12 +215,15 @@ export async function moveAsset(
   toEnvironmentId: string | null,
   reason: string,
 ) {
-  const { data, error } = await client().rpc('move_asset', {
-    p_asset_id: assetId,
-    p_to_unit_id: toUnitId,
-    p_to_environment_id: toEnvironmentId,
-    p_reason: reason.trim(),
-  })
+  const { data, error } = await client().rpc(
+    'move_asset',
+    {
+      p_asset_id: assetId,
+      p_to_unit_id: toUnitId,
+      p_to_environment_id: toEnvironmentId,
+      p_reason: reason.trim(),
+    },
+  )
 
   throwIfError(error)
 
@@ -243,13 +244,15 @@ export interface UnitInput {
 }
 
 export async function createUnit(input: UnitInput) {
-  const { error } = await client().from('units').insert({
-    code: input.code.trim().toUpperCase(),
-    name: input.name.trim(),
-    description: input.description?.trim() || null,
-    address_text: input.address_text?.trim() || null,
-    active: input.active ?? true,
-  })
+  const { error } = await client()
+    .from('units')
+    .insert({
+      code: input.code.trim().toUpperCase(),
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      address_text: input.address_text?.trim() || null,
+      active: input.active ?? true,
+    })
 
   throwIfError(error)
 }
