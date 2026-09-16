@@ -50,18 +50,18 @@ const ownershipLabels: Record<
   commodatum: 'Comodato',
   leased: 'Locado',
   third_party: 'Terceiro',
-  other: 'Outro',
+  other: 'Outra identificação',
 }
 
 const identifierLabels: Record<
   ExternalIdentifierType,
   string
 > = {
-  patrimony: 'Patrimônio',
-  tombamento: 'Tombamento',
-  internal_serial: 'Serial interno',
-  contract: 'Contrato',
-  other: 'Outro',
+  patrimony: 'Patrimônio externo',
+  tombamento: 'Tombamento externo',
+  internal_serial: 'Número interno anterior',
+  contract: 'Contrato / convênio',
+  other: 'Outra identificação',
 }
 
 function Field({
@@ -211,7 +211,7 @@ export function AssetSmartMetadataCard({
             Identificação, aquisição e custódia
           </div>
           <div className="mt-1 text-xs text-slate-500">
-            Serial, garantia, nota fiscal e patrimônio de instituições externas.
+            Código interno, série do fabricante, garantia e identificações externas ou anteriores.
           </div>
         </div>
 
@@ -266,7 +266,12 @@ export function AssetSmartMetadataCard({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Info
               icon={<Fingerprint size={14} />}
-              label="Serial"
+              label="Código interno do patrimônio"
+              value={profile.core.asset_code}
+            />
+            <Info
+              icon={<Fingerprint size={14} />}
+              label="Número de série do fabricante"
               value={
                 profile.core
                   .serial_number ||
@@ -275,7 +280,7 @@ export function AssetSmartMetadataCard({
             />
             <Info
               icon={<BadgeCheck size={14} />}
-              label="Service Tag"
+              label="Código de serviço do fabricante"
               value={
                 profile.core
                   .service_tag ||
@@ -284,7 +289,7 @@ export function AssetSmartMetadataCard({
             />
             <Info
               icon={<FileText size={14} />}
-              label="Product / Part No."
+              label="Código do produto/peça"
               value={
                 profile.core
                   .product_number ||
@@ -361,7 +366,7 @@ export function AssetSmartMetadataCard({
             {profile.identifiers
               .length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 p-4 text-xs text-slate-400">
-                Nenhum patrimônio de outra instituição vinculado.
+                Nenhuma identificação externa ou anterior vinculada.
               </div>
             ) : (
               <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
@@ -386,7 +391,7 @@ export function AssetSmartMetadataCard({
                           ·{' '}
                           {item.organization
                             ?.name ??
-                            'Instituição'}
+                            'Sem instituição vinculada'}
                         </div>
                       </div>
 
@@ -664,7 +669,7 @@ function CoreEditModal({
           </div>
         )}
 
-        <Field label="Service Tag">
+        <Field label="Código de serviço do fabricante">
           <input
             className={inputClass}
             value={serviceTag}
@@ -676,7 +681,7 @@ function CoreEditModal({
           />
         </Field>
 
-        <Field label="Product / Part Number">
+        <Field label="Código do produto/peça do fabricante (opcional)">
           <input
             className={inputClass}
             value={productNumber}
@@ -845,16 +850,15 @@ function IdentifierModal({
       setSaving(true)
       setErrorMessage(null)
 
-      let resolvedOrganizationId =
-        organizationId
+      let resolvedOrganizationId:
+        | string
+        | null =
+        organizationId || null
 
-      if (!resolvedOrganizationId) {
-        if (!newOrganizationName.trim()) {
-          throw new Error(
-            'Selecione ou informe a instituição.',
-          )
-        }
-
+      if (
+        !resolvedOrganizationId &&
+        newOrganizationName.trim()
+      ) {
         resolvedOrganizationId =
           await ensureExternalOrganization({
             name: newOrganizationName,
@@ -885,8 +889,8 @@ function IdentifierModal({
   return (
     <FormModal
       open
-      title="Adicionar identificador externo"
-      description="Patrimônio, tombamento ou código utilizado por outra instituição."
+      title="Adicionar identificação externa/anterior"
+      description="Patrimônio, tombamento, código de doação ou numeração anterior. A instituição é opcional."
       onClose={onClose}
       widthClassName="max-w-xl"
       footer={
@@ -927,7 +931,7 @@ function IdentifierModal({
           </div>
         )}
 
-        <Field label="Instituição já cadastrada">
+        <Field label="Instituição de origem (opcional)">
           <select
             className={inputClass}
             value={organizationId}
@@ -955,7 +959,7 @@ function IdentifierModal({
 
         {!organizationId && (
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Nova instituição">
+            <Field label="Nova instituição (opcional)">
               <input
                 className={inputClass}
                 value={
@@ -1008,7 +1012,7 @@ function IdentifierModal({
           </select>
         </Field>
 
-        <Field label="Código">
+        <Field label="Número / código externo">
           <input
             className={inputClass}
             value={identifierValue}

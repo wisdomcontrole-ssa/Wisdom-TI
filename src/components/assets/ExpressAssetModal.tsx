@@ -380,7 +380,7 @@ export function ExpressAssetModal({
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : 'NÃ£o foi possÃ­vel preparar o cadastro.',
+            : 'Não foi possível preparar o cadastro.',
         )
       } finally {
         if (active) {
@@ -538,20 +538,11 @@ export function ExpressAssetModal({
       !organizationName.trim()
     ) {
       setErrorMessage(
-        'Informe a instituiÃ§Ã£o responsÃ¡vel pelo equipamento cedido, emprestado ou de terceiro.',
+        'Informe a instituição responsável pelo equipamento cedido, emprestado ou de terceiro.',
       )
       return
     }
 
-    if (
-      externalIdentifierValue.trim() &&
-      !organizationName.trim()
-    ) {
-      setErrorMessage(
-        'Informe a instituiÃ§Ã£o vinculada ao identificador externo.',
-      )
-      return
-    }
 
     try {
       setSaving(true)
@@ -591,8 +582,8 @@ export function ExpressAssetModal({
         } catch (error) {
           warnings.push(
             error instanceof Error
-              ? `InstituiÃ§Ã£o: ${error.message}`
-              : 'NÃ£o foi possÃ­vel registrar a instituiÃ§Ã£o.',
+              ? `Instituição: ${error.message}`
+              : 'Não foi possível registrar a instituição.',
           )
         }
       }
@@ -613,7 +604,7 @@ export function ExpressAssetModal({
         warnings.push(
           error instanceof Error
             ? `Dados complementares: ${error.message}`
-            : 'Dados complementares nÃ£o foram salvos.',
+            : 'Dados complementares não foram salvos.',
         )
       }
 
@@ -685,10 +676,7 @@ export function ExpressAssetModal({
           )
         }
       }
-      if (
-        organizationId &&
-        externalIdentifierValue.trim()
-      ) {
+      if (externalIdentifierValue.trim()) {
         try {
           await addAssetExternalIdentifier({
             assetId: asset.id,
@@ -702,7 +690,7 @@ export function ExpressAssetModal({
           warnings.push(
             error instanceof Error
               ? `Identificador externo: ${error.message}`
-              : 'Identificador externo nÃ£o foi salvo.',
+              : 'Identificador externo não foi salvo.',
           )
         }
       }
@@ -732,7 +720,7 @@ export function ExpressAssetModal({
               captureMethod: 'camera',
               caption: ocrSnapshot
                 ? 'Etiqueta original analisada pelo OCR'
-                : 'Foto do prÃ©-cadastro Express',
+                : 'Foto do pré-cadastro Express',
             })
 
           labelEvidenceId =
@@ -741,7 +729,7 @@ export function ExpressAssetModal({
           warnings.push(
             error instanceof Error
               ? `Foto da etiqueta: ${error.message}`
-              : 'Foto da etiqueta nÃ£o foi enviada.',
+              : 'Foto da etiqueta não foi enviada.',
           )
         }
       }
@@ -791,8 +779,8 @@ export function ExpressAssetModal({
         } catch (error) {
           warnings.push(
             error instanceof Error
-              ? `HistÃ³rico OCR: ${error.message}`
-              : 'HistÃ³rico OCR nÃ£o foi registrado.',
+              ? `Histórico OCR: ${error.message}`
+              : 'Histórico OCR não foi registrado.',
           )
         }
       }
@@ -827,7 +815,7 @@ export function ExpressAssetModal({
             warnings.push(
               error instanceof Error
                 ? `Arquivo da nota fiscal: ${error.message}`
-                : 'Arquivo da nota fiscal nÃ£o foi enviado.',
+                : 'Arquivo da nota fiscal não foi enviado.',
             )
           }
         }
@@ -852,7 +840,7 @@ export function ExpressAssetModal({
           warnings.push(
             error instanceof Error
               ? `Nota fiscal: ${error.message}`
-              : 'Nota fiscal nÃ£o foi vinculada.',
+              : 'Nota fiscal não foi vinculada.',
           )
         }
       }
@@ -867,7 +855,7 @@ export function ExpressAssetModal({
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'NÃ£o foi possÃ­vel criar o prÃ©-cadastro.',
+          : 'Não foi possível criar o pré-cadastro.',
       )
     } finally {
       setSaving(false)
@@ -878,7 +866,7 @@ export function ExpressAssetModal({
     <FormModal
       open={open}
       title="Novo ativo Express"
-      description="PrÃ©-cadastro rÃ¡pido com leitura inteligente de etiqueta, rastreio fiscal e posse institucional."
+      description="Pré-cadastro rápido com leitura inteligente de etiqueta, rastreio fiscal e posse institucional."
       onClose={onClose}
       widthClassName="max-w-3xl"
       footer={
@@ -905,7 +893,7 @@ export function ExpressAssetModal({
             <PackagePlus size={16} />
             {saving
               ? 'Cadastrando...'
-              : 'Criar prÃ©-cadastro'}
+              : 'Criar pré-cadastro'}
           </button>
         </div>
       }
@@ -927,6 +915,18 @@ export function ExpressAssetModal({
           disabled={saving}
           onApply={applyOcr}
         />
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">
+            Código interno do patrimônio
+          </div>
+          <div className="mt-1 text-sm font-semibold text-slate-800">
+            Gerado automaticamente ao salvar
+          </div>
+          <div className="mt-1 text-xs leading-5 text-slate-500">
+            Padrão WIS-TIPO-000000. Este é o identificador interno da instituição e não precisa ser digitado.
+          </div>
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Tipo do ativo">
@@ -966,13 +966,13 @@ export function ExpressAssetModal({
                 Compra
               </option>
               <option value="donation">
-                DoaÃ§Ã£o
+                Doação
               </option>
               <option value="used">
                 Equipamento usado
               </option>
               <option value="transfer">
-                TransferÃªncia
+                Transferência
               </option>
               <option value="other">
                 Outra origem
@@ -1006,7 +1006,7 @@ export function ExpressAssetModal({
             />
           </Field>
 
-          <Field label="NÃºmero de sÃ©rie">
+          <Field label="Número de série do fabricante">
             <input
               className={inputClass}
               value={serial}
@@ -1019,7 +1019,7 @@ export function ExpressAssetModal({
             />
           </Field>
 
-          <Field label="Service Tag">
+          <Field label="Código de serviço do fabricante (opcional)">
             <input
               className={inputClass}
               value={serviceTag}
@@ -1032,7 +1032,7 @@ export function ExpressAssetModal({
             />
           </Field>
 
-          <Field label="Product / Part Number">
+          <Field label="Código do produto/peça do fabricante (opcional)">
             <input
               className={inputClass}
               value={productNumber}
@@ -1044,7 +1044,7 @@ export function ExpressAssetModal({
             />
           </Field>
 
-          <Field label="AlimentaÃ§Ã£o / tensÃ£o">
+          <Field label="Alimentação / tensão">
             <input
               className={inputClass}
               value={
@@ -1055,7 +1055,7 @@ export function ExpressAssetModal({
                   event.target.value,
                 )
               }
-              placeholder="Ex.: 100-240V Â· 50/60Hz"
+              placeholder="Ex.: 100-240V · 50/60Hz"
             />
           </Field>
         </div>
@@ -1230,14 +1230,14 @@ export function ExpressAssetModal({
           </Field>
         </div>
 
-        <Field label="ObservaÃ§Ã£o rÃ¡pida">
+        <Field label="Observação rápida">
           <textarea
             className={textareaClass}
             value={notes}
             onChange={(event) =>
               setNotes(event.target.value)
             }
-            placeholder="Ex.: recebido na portaria, NF pendente, doaÃ§Ã£o..."
+            placeholder="Ex.: recebido na portaria, NF pendente, doação..."
           />
         </Field>
 
@@ -1283,10 +1283,10 @@ export function ExpressAssetModal({
         >
           <div>
             <div className="text-sm font-black text-slate-900">
-              AquisiÃ§Ã£o, garantia e instituiÃ§Ã£o
+              Aquisição, garantia e identificação externa
             </div>
             <div className="mt-1 text-xs text-slate-500">
-              Nota fiscal, equipamento cedido/emprestado e identificaÃ§Ã£o de outro Ã³rgÃ£o.
+              Nota fiscal, garantia, posse e códigos externos ou anteriores.
             </div>
           </div>
           <ChevronDown
@@ -1302,7 +1302,7 @@ export function ExpressAssetModal({
         {advancedOpen && (
           <div className="space-y-5 rounded-2xl border border-slate-200 p-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Data de aquisiÃ§Ã£o">
+              <Field label="Data de aquisição">
                 <input
                   type="date"
                   className={inputClass}
@@ -1316,7 +1316,7 @@ export function ExpressAssetModal({
                 />
               </Field>
 
-              <Field label="Garantia atÃ©">
+              <Field label="Garantia até">
                 <input
                   type="date"
                   className={inputClass}
@@ -1335,11 +1335,11 @@ export function ExpressAssetModal({
 
             <div className="border-t border-slate-100 pt-4">
               <div className="text-xs font-black uppercase tracking-[0.08em] text-slate-400">
-                Posse / custÃ³dia
+                Posse / custódia e referência externa
               </div>
 
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                <Field label="SituaÃ§Ã£o">
+                <Field label="Situação">
                   <select
                     className={inputClass}
                     value={
@@ -1353,13 +1353,13 @@ export function ExpressAssetModal({
                     }
                   >
                     <option value="own">
-                      PrÃ³prio
+                      Próprio
                     </option>
                     <option value="ceded">
-                      Cedido para nÃ³s
+                      Cedido para nós
                     </option>
                     <option value="loaned">
-                      Emprestado para nÃ³s
+                      Emprestado para nós
                     </option>
                     <option value="commodatum">
                       Comodato
@@ -1376,7 +1376,7 @@ export function ExpressAssetModal({
                   </select>
                 </Field>
 
-                <Field label="InstituiÃ§Ã£o">
+                <Field label="Instituição responsável/de origem (quando houver)">
                   <input
                     className={inputClass}
                     value={
@@ -1388,7 +1388,7 @@ export function ExpressAssetModal({
                           .value,
                       )
                     }
-                    placeholder="Nome do Ã³rgÃ£o/instituiÃ§Ã£o"
+                    placeholder="Nome do órgão/instituição"
                   />
                 </Field>
 
@@ -1439,7 +1439,7 @@ export function ExpressAssetModal({
                   />
                 </Field>
 
-                <Field label="Tipo do identificador externo">
+                <Field label="Tipo da identificação externa/anterior">
                   <select
                     className={inputClass}
                     value={
@@ -1453,25 +1453,25 @@ export function ExpressAssetModal({
                     }
                   >
                     <option value="patrimony">
-                      PatrimÃ´nio
+                      Patrimônio de outro órgão
                     </option>
                     <option value="tombamento">
-                      Tombamento
+                      Tombamento de outro órgão
                     </option>
                     <option value="internal_serial">
-                      Serial interno
+                      Número interno anterior
                     </option>
                     <option value="contract">
-                      Contrato
+                      Número de contrato
                     </option>
                     <option value="other">
-                      Outro
+                      Outra identificação
                     </option>
                   </select>
                 </Field>
 
                 <div className="sm:col-span-2">
-                  <Field label="CÃ³digo / patrimÃ´nio da outra instituiÃ§Ã£o">
+                  <Field label="Número externo / identificação anterior (opcional)">
                     <input
                       className={inputClass}
                       value={
@@ -1483,7 +1483,7 @@ export function ExpressAssetModal({
                             .value,
                         )
                       }
-                      placeholder="Este cÃ³digo tambÃ©m localizarÃ¡ o ativo"
+                      placeholder="Ex.: patrimônio anterior, código de doação ou número de outro órgão"
                     />
                   </Field>
                 </div>
@@ -1502,7 +1502,7 @@ export function ExpressAssetModal({
               </div>
 
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                <Field label="NÃºmero">
+                <Field label="Número">
                   <input
                     className={inputClass}
                     value={
@@ -1517,7 +1517,7 @@ export function ExpressAssetModal({
                   />
                 </Field>
 
-                <Field label="SÃ©rie">
+                <Field label="Série">
                   <input
                     className={inputClass}
                     value={
@@ -1532,7 +1532,7 @@ export function ExpressAssetModal({
                   />
                 </Field>
 
-                <Field label="Data de emissÃ£o">
+                <Field label="Data de emissão">
                   <input
                     type="date"
                     className={inputClass}

@@ -49,7 +49,7 @@ export interface AssetSmartCore {
 export interface AssetExternalIdentifier {
   id: string
   asset_id: string
-  organization_id: string
+  organization_id: string | null
   identifier_type: ExternalIdentifierType
   identifier_value: string
   notes: string | null
@@ -91,7 +91,7 @@ export interface AssetSmartSearchResult {
   external_identifiers: Array<{
     value: string
     type: string
-    organization: string
+    organization: string | null
   }>
   purchase_documents: Array<{
     number: string

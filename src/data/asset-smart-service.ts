@@ -13,7 +13,7 @@ import type {
 
 function client() {
   if (!supabase) {
-    throw new Error('Supabase nÃ£o estÃ¡ configurado.')
+    throw new Error('Supabase não está configurado.')
   }
 
   return supabase
@@ -99,7 +99,7 @@ export async function setAssetSmartCore(input: {
 
 export async function addAssetExternalIdentifier(input: {
   assetId: string
-  organizationId: string
+  organizationId?: string | null
   identifierType: ExternalIdentifierType
   identifierValue: string
   notes?: string
@@ -108,7 +108,7 @@ export async function addAssetExternalIdentifier(input: {
     'add_asset_external_identifier',
     {
       p_asset_id: input.assetId,
-      p_organization_id: input.organizationId,
+      p_organization_id: input.organizationId ?? null,
       p_identifier_type: input.identifierType,
       p_identifier_value: input.identifierValue.trim(),
       p_notes: input.notes?.trim() || null,
@@ -261,7 +261,11 @@ export async function getAssetSmartProfile(
       .map((item) => ({
         ...item,
         organization:
-          organizationMap.get(item.organization_id),
+          item.organization_id
+            ? organizationMap.get(
+                item.organization_id,
+              )
+            : undefined,
       }))
 
   const documentIds = (linksResult.data ?? [])

@@ -291,7 +291,7 @@ export function AssetDetailPage() {
 
             <div>
               <div className="font-mono text-xs font-bold text-slate-400">
-                {asset.asset_code}
+                Código interno · {asset.asset_code}
               </div>
               <h1 className="mt-0.5 text-2xl font-bold tracking-[-0.035em] text-slate-950">
                 {asset.manufacturer ||
@@ -357,7 +357,7 @@ export function AssetDetailPage() {
               value={statusLabels[asset.status]}
             />
             <InfoItem
-              label="Número de série"
+              label="Número de série do fabricante"
               value={asset.serial_number ?? '—'}
             />
             <InfoItem
@@ -716,7 +716,7 @@ function EditAssetModal({
             />
           </Field>
 
-          <Field label="Número de série">
+          <Field label="Número de série do fabricante">
             <input
               className={inputClass}
               value={serial}
