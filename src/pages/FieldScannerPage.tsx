@@ -39,7 +39,7 @@ export function FieldScannerPage() {
       <PageHeader
         eyebrow="Operação de campo"
         title="Escanear item"
-        description="Aponte a câmera para o QR Code ou digite o código curto. O sistema abre diretamente a ficha correspondente."
+        description="Aponte a câmera para o QR Code ou código de barras. Código interno, Código de terceiro e serial do fabricante levam à mesma ficha quando cadastrados."
       />
 
       <InventoryScanner

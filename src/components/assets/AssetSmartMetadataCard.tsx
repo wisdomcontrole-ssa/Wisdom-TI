@@ -35,6 +35,7 @@ import type {
   ExternalIdentifierType,
   OwnershipType,
 } from '../../types/asset-smart'
+import { InventoryScanner } from '../field/InventoryScanner'
 import { FormModal } from '../ui/FormModal'
 
 const inputClass =
@@ -57,11 +58,11 @@ const identifierLabels: Record<
   ExternalIdentifierType,
   string
 > = {
-  patrimony: 'Patrimônio externo',
-  tombamento: 'Tombamento externo',
-  internal_serial: 'Número interno anterior',
+  patrimony: 'Código de terceiro',
+  tombamento: 'Código de terceiro · tombamento',
+  internal_serial: 'Código de terceiro · número anterior',
   contract: 'Contrato / convênio',
-  other: 'Outra identificação',
+  other: 'Outro código de terceiro',
 }
 
 function Field({
@@ -202,6 +203,24 @@ export function AssetSmartMetadataCard({
           .owner_organization_id,
     )
 
+  const primaryThirdPartyIdentifier =
+    profile?.identifiers.find(
+      (item) =>
+        item.identifier_type === 'patrimony',
+    ) ??
+    profile?.identifiers.find(
+      (item) =>
+        item.identifier_type === 'tombamento',
+    ) ??
+    profile?.identifiers.find(
+      (item) =>
+        item.identifier_type === 'internal_serial',
+    ) ??
+    profile?.identifiers.find(
+      (item) =>
+        item.identifier_type === 'other',
+    )
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
@@ -211,7 +230,7 @@ export function AssetSmartMetadataCard({
             Identificação, aquisição e custódia
           </div>
           <div className="mt-1 text-xs text-slate-500">
-            Código interno, série do fabricante, garantia e identificações externas ou anteriores.
+            Código interno, número de série do fabricante, Código de terceiro, garantia e custódia.
           </div>
         </div>
 
@@ -275,6 +294,15 @@ export function AssetSmartMetadataCard({
               value={
                 profile.core
                   .serial_number ||
+                'Não informado'
+              }
+            />
+            <Info
+              icon={<Fingerprint size={14} />}
+              label="Código de terceiro"
+              value={
+                primaryThirdPartyIdentifier
+                  ?.identifier_value ||
                 'Não informado'
               }
             />
@@ -345,7 +373,7 @@ export function AssetSmartMetadataCard({
           <div>
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="text-xs font-black uppercase tracking-[0.08em] text-slate-400">
-                Identificadores externos
+                Códigos de terceiro e referências
               </div>
               {canUpdate && (
                 <button
@@ -366,7 +394,7 @@ export function AssetSmartMetadataCard({
             {profile.identifiers
               .length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 p-4 text-xs text-slate-400">
-                Nenhuma identificação externa ou anterior vinculada.
+                Nenhum Código de terceiro ou referência auxiliar vinculada.
               </div>
             ) : (
               <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
@@ -879,7 +907,7 @@ function IdentifierModal({
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'Não foi possível adicionar o identificador.',
+          : 'Não foi possível adicionar o Código de terceiro.',
       )
     } finally {
       setSaving(false)
@@ -889,8 +917,8 @@ function IdentifierModal({
   return (
     <FormModal
       open
-      title="Adicionar identificação externa/anterior"
-      description="Patrimônio, tombamento, código de doação ou numeração anterior. A instituição é opcional."
+      title="Adicionar Código de terceiro"
+      description="Cadastre o número da plaqueta/tag do órgão ou empresa. Você pode digitar ou ler o código de barras."
       onClose={onClose}
       widthClassName="max-w-xl"
       footer={
@@ -986,7 +1014,7 @@ function IdentifierModal({
           </div>
         )}
 
-        <Field label="Tipo">
+        <Field label="Classificação do Código de terceiro">
           <select
             className={inputClass}
             value={identifierType}
@@ -1012,7 +1040,7 @@ function IdentifierModal({
           </select>
         </Field>
 
-        <Field label="Número / código externo">
+        <Field label="Código de terceiro">
           <input
             className={inputClass}
             value={identifierValue}
@@ -1021,9 +1049,22 @@ function IdentifierModal({
                 event.target.value,
               )
             }
+            placeholder="Ex.: 00457821"
             required
           />
         </Field>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="mb-2 text-xs font-bold text-slate-700">
+            Ler código de barras do terceiro
+          </div>
+          <InventoryScanner
+            compact
+            onScan={async (value) => {
+              setIdentifierValue(value)
+            }}
+          />
+        </div>
       </form>
     </FormModal>
   )
@@ -1290,7 +1331,7 @@ function RetireIdentifierModal({
   return (
     <FormModal
       open
-      title="Retirar identificador externo"
+      title="Retirar Código de terceiro / referência"
       description={
         target.identifier_value
       }

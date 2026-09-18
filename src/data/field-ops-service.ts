@@ -5,6 +5,7 @@ import type {
   ExpressAssetRecord,
   InventoryResolvedItem,
   LabelCatalogItem,
+  M12AssetIdentifier,
   M12AssetLink,
   M12ClassicBinding,
   M12GenericBinding,
@@ -102,18 +103,326 @@ export async function completeExpressAsset(
   return data as ExpressAssetRecord
 }
 
+interface InventoryAssetLookupRow {
+  id: string
+  asset_code: string
+  manufacturer: string | null
+  model: string | null
+  status: string
+  registration_state?: string | null
+}
+
+interface InventoryStockLookupRow {
+  id: string
+  stock_code: string
+  short_code: string | null
+  status: string
+  installed_asset_id: string | null
+  manufacturer: string | null
+  model: string | null
+}
+
+function normalizeInventoryLookup(value: string) {
+  let clean = value.trim()
+
+  if (!clean) return ''
+
+  try {
+    const url = new URL(clean)
+    const path = decodeURIComponent(url.pathname)
+
+    const assetMarker = '/ativo/'
+    const identifyMarker = '/identificar/'
+
+    if (path.toLowerCase().includes(assetMarker)) {
+      clean = path.slice(
+        path.toLowerCase().lastIndexOf(assetMarker) +
+          assetMarker.length,
+      )
+    } else if (
+      path.toLowerCase().includes(identifyMarker)
+    ) {
+      clean = path.slice(
+        path.toLowerCase().lastIndexOf(identifyMarker) +
+          identifyMarker.length,
+      )
+    }
+  } catch {
+    const normalized = clean.replaceAll('\\', '/')
+    const upper = normalized.toUpperCase()
+
+    for (const marker of ['/ATIVO/', '/IDENTIFICAR/']) {
+      const index = upper.lastIndexOf(marker)
+
+      if (index >= 0) {
+        clean = normalized.slice(index + marker.length)
+        break
+      }
+    }
+  }
+
+  return clean
+    .split(/[?#]/, 1)[0]
+    .replace(/^\/+|\/+$/g, '')
+    .trim()
+}
+
+function escapeIlikePattern(value: string) {
+  return value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('%', '\\%')
+    .replaceAll('_', '\\_')
+}
+
+function assetLookupToResolved(
+  row: InventoryAssetLookupRow,
+): InventoryResolvedItem {
+  return {
+    kind: 'asset',
+    id: row.id,
+    code: row.asset_code,
+    short_code: null,
+    status: row.status,
+    display_name:
+      [row.manufacturer, row.model]
+        .filter(Boolean)
+        .join(' ') || 'Ativo',
+    registration_state:
+      (row.registration_state ??
+        null) as InventoryResolvedItem['registration_state'],
+  }
+}
+
+function stockLookupToResolved(
+  row: InventoryStockLookupRow,
+): InventoryResolvedItem {
+  return {
+    kind: 'stock_unit',
+    id: row.id,
+    code: row.stock_code,
+    short_code: row.short_code,
+    status: row.status,
+    display_name:
+      [row.manufacturer, row.model]
+        .filter(Boolean)
+        .join(' ') || 'Item de estoque',
+    installed_asset_id: row.installed_asset_id,
+  }
+}
+
+async function lookupAssetById(assetId: string) {
+  const { data, error } = await client()
+    .from('assets')
+    .select(
+      'id, asset_code, manufacturer, model, status, registration_state',
+    )
+    .eq('id', assetId)
+    .single()
+
+  throwIfError(error)
+
+  return assetLookupToResolved(
+    data as unknown as InventoryAssetLookupRow,
+  )
+}
+
 export async function resolveInventoryCode(
   value: string,
 ) {
+  const clean = normalizeInventoryLookup(value)
+
+  if (!clean) {
+    return {
+      kind: 'unknown',
+      id: null,
+      code: '',
+      short_code: null,
+      status: null,
+      display_name: null,
+    } satisfies InventoryResolvedItem
+  }
+
+  const internalCode = clean.toUpperCase()
+
+  const { data: exactAssets, error: exactAssetError } =
+    await client()
+      .from('assets')
+      .select(
+        'id, asset_code, manufacturer, model, status, registration_state',
+      )
+      .eq('asset_code', internalCode)
+      .limit(2)
+
+  throwIfError(exactAssetError)
+
+  const assetRows =
+    (exactAssets ?? []) as unknown as InventoryAssetLookupRow[]
+
+  if (assetRows.length === 1) {
+    return assetLookupToResolved(assetRows[0])
+  }
+
+  const [stockCodeResult, shortCodeResult] =
+    await Promise.all([
+      client()
+        .from('stock_units')
+        .select(
+          'id, stock_code, short_code, status, installed_asset_id, manufacturer, model',
+        )
+        .eq('stock_code', internalCode)
+        .limit(2),
+      client()
+        .from('stock_units')
+        .select(
+          'id, stock_code, short_code, status, installed_asset_id, manufacturer, model',
+        )
+        .eq('short_code', internalCode)
+        .limit(2),
+    ])
+
+  throwIfError(stockCodeResult.error)
+  throwIfError(shortCodeResult.error)
+
+  const stockById = new Map<string, InventoryStockLookupRow>()
+
+  for (const row of [
+    ...((stockCodeResult.data ?? []) as unknown as InventoryStockLookupRow[]),
+    ...((shortCodeResult.data ?? []) as unknown as InventoryStockLookupRow[]),
+  ]) {
+    stockById.set(row.id, row)
+  }
+
+  if (stockById.size === 1) {
+    return stockLookupToResolved(
+      [...stockById.values()][0],
+    )
+  }
+
+  const ilikeValue = escapeIlikePattern(clean)
+
+  const {
+    data: externalRowsData,
+    error: externalRowsError,
+  } = await client()
+    .from('asset_external_identifiers')
+    .select('asset_id, identifier_value')
+    .eq('active', true)
+    .ilike('identifier_value', ilikeValue)
+    .limit(4)
+
+  throwIfError(externalRowsError)
+
+  const externalRows =
+    (externalRowsData ?? []) as unknown as Array<{
+      asset_id: string
+      identifier_value: string
+    }>
+
+  const externalAssetIds = Array.from(
+    new Set(externalRows.map((row) => row.asset_id)),
+  )
+
+  if (externalAssetIds.length > 1) {
+    throw new Error(
+      'Código de terceiro associado a mais de um ativo. Use o Código interno ou o número de série para evitar identificação incorreta.',
+    )
+  }
+
+  if (externalAssetIds.length === 1) {
+    return lookupAssetById(externalAssetIds[0])
+  }
+
+  const {
+    data: serialRowsData,
+    error: serialRowsError,
+  } = await client()
+    .from('assets')
+    .select(
+      'id, asset_code, manufacturer, model, status, registration_state',
+    )
+    .ilike('serial_number', ilikeValue)
+    .limit(4)
+
+  throwIfError(serialRowsError)
+
+  const serialRows =
+    (serialRowsData ?? []) as unknown as InventoryAssetLookupRow[]
+
+  if (serialRows.length > 1) {
+    throw new Error(
+      'Número de série associado a mais de um ativo. Use o Código interno ou o Código de terceiro para confirmar o equipamento.',
+    )
+  }
+
+  if (serialRows.length === 1) {
+    return assetLookupToResolved(serialRows[0])
+  }
+
+  const {
+    data: serviceTagRowsData,
+    error: serviceTagRowsError,
+  } = await client()
+    .from('assets')
+    .select(
+      'id, asset_code, manufacturer, model, status, registration_state',
+    )
+    .ilike('service_tag', ilikeValue)
+    .limit(4)
+
+  throwIfError(serviceTagRowsError)
+
+  const serviceTagRows =
+    (serviceTagRowsData ?? []) as unknown as InventoryAssetLookupRow[]
+
+  if (serviceTagRows.length > 1) {
+    throw new Error(
+      'Código de serviço do fabricante associado a mais de um ativo.',
+    )
+  }
+
+  if (serviceTagRows.length === 1) {
+    return assetLookupToResolved(serviceTagRows[0])
+  }
+
+  const {
+    data: assetResolution,
+    error: assetResolutionError,
+  } = await client().rpc(
+    'resolve_asset_by_code',
+    {
+      p_code: clean,
+    },
+  )
+
+  throwIfError(assetResolutionError)
+
+  const aliasResult = assetResolution as {
+    asset_id?: string | null
+  } | null
+
+  if (aliasResult?.asset_id) {
+    return lookupAssetById(aliasResult.asset_id)
+  }
+
   const { data, error } = await client().rpc(
     'resolve_inventory_code',
     {
-      p_code: value.trim(),
+      p_code: clean,
     },
   )
 
   throwIfError(error)
-  return data as InventoryResolvedItem
+
+  return (
+    (data as InventoryResolvedItem) ?? {
+      kind: 'unknown',
+      id: null,
+      code: clean,
+      short_code: null,
+      status: null,
+      display_name: null,
+    }
+  )
 }
 
 export async function linkStockBinding(input: {
@@ -195,6 +504,7 @@ export async function unlinkAssetBinding(input: {
 export async function listInventoryCatalog() {
   const [
     assetsResult,
+    assetIdentifiersResult,
     typesResult,
     stockResult,
     productsResult,
@@ -209,6 +519,14 @@ export async function listInventoryCatalog() {
       )
       .order('created_at', { ascending: false })
       .limit(2000),
+    client()
+      .from('asset_external_identifiers')
+      .select(
+        'id, asset_id, organization_id, identifier_type, identifier_value, active, created_at',
+      )
+      .eq('active', true)
+      .order('created_at', { ascending: true })
+      .limit(4000),
     client()
       .from('asset_types')
       .select('id, code, name, description, active')
@@ -245,6 +563,7 @@ export async function listInventoryCatalog() {
   ])
 
   throwIfError(assetsResult.error)
+  throwIfError(assetIdentifiersResult.error)
   throwIfError(typesResult.error)
   throwIfError(stockResult.error)
   throwIfError(productsResult.error)
@@ -254,6 +573,8 @@ export async function listInventoryCatalog() {
 
   return {
     assets: (assetsResult.data ?? []) as AssetRecord[],
+    assetIdentifiers:
+      (assetIdentifiersResult.data ?? []) as unknown as M12AssetIdentifier[],
     types: (typesResult.data ?? []) as AssetTypeRecord[],
     stockUnits:
       (stockResult.data ?? []) as M12StockUnit[],
@@ -378,6 +699,41 @@ export async function listLabelCatalog() {
     catalog.products.map((item) => [item.id, item]),
   )
 
+  const identifiersByAsset = new Map<
+    string,
+    M12AssetIdentifier[]
+  >()
+
+  for (const identifier of catalog.assetIdentifiers) {
+    const rows =
+      identifiersByAsset.get(identifier.asset_id) ?? []
+    rows.push(identifier)
+    identifiersByAsset.set(identifier.asset_id, rows)
+  }
+
+  function thirdPartyCodeFor(assetId: string) {
+    const identifiers =
+      identifiersByAsset.get(assetId) ?? []
+
+    const priority = [
+      'patrimony',
+      'tombamento',
+      'internal_serial',
+      'other',
+    ]
+
+    for (const type of priority) {
+      const match = identifiers.find(
+        (identifier) =>
+          identifier.identifier_type === type,
+      )
+
+      if (match) return match.identifier_value
+    }
+
+    return null
+  }
+
   const items: LabelCatalogItem[] = [
     ...catalog.assets.map((asset) => {
       const type = typeMap.get(asset.asset_type_id)
@@ -395,6 +751,8 @@ export async function listLabelCatalog() {
           type?.name ||
           'Ativo',
         serial: asset.serial_number,
+        thirdPartyCode:
+          thirdPartyCodeFor(asset.id),
         status: asset.status,
       }
     }),
@@ -414,6 +772,7 @@ export async function listLabelCatalog() {
           product?.category ||
           'Componente',
         serial: stock.serial_number,
+        thirdPartyCode: null,
         status: stock.status,
       }
     }),

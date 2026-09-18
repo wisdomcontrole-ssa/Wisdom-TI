@@ -2,6 +2,8 @@ import {
   Boxes,
   ChevronRight,
   Filter,
+  MapPin,
+  Monitor,
   Plus,
   RefreshCw,
   Search,
@@ -18,15 +20,22 @@ import { useAuth } from '../auth/useAuth'
 import { FormModal } from '../components/ui/FormModal'
 import { PageHeader } from '../components/ui/PageHeader'
 import {
+  createEnvironment,
+  listAssets,
   listEnvironments,
   listUnits,
 } from '../data/asset-service'
+import {
+  listTechnicalEntryCatalog,
+  type TechnicalEntryCatalog,
+} from '../data/entry-catalog-service'
 import {
   createStockUnit,
   listStockProducts,
   listStockUnits,
 } from '../data/stock-service'
 import type {
+  AssetRecord,
   EnvironmentRecord,
   UnitRecord,
 } from '../types/assets'
@@ -39,6 +48,20 @@ import type {
 
 const inputClass =
   'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100'
+
+const emptyCatalog: TechnicalEntryCatalog = {
+  manufacturers: [],
+  processorManufacturers: [],
+  processorModels: [],
+  memorySizesGb: [],
+  memoryTypes: [],
+  memorySpeedsMhz: [],
+  storageCapacitiesGb: [],
+  storageTypes: [],
+  storageInterfaces: [],
+  storageFormFactors: [],
+  operatingSystems: [],
+}
 
 const statusLabels: Record<StockStatus, string> = {
   in_stock: 'Em estoque',
@@ -64,22 +87,39 @@ const statusClass: Record<StockStatus, string> = {
 }
 
 async function loadInventoryData() {
-  const [items, products, units, environments] =
-    await Promise.all([
-      listStockUnits(),
-      listStockProducts(),
-      listUnits(),
-      listEnvironments(),
-    ])
+  const [
+    items,
+    products,
+    units,
+    environments,
+    assets,
+    catalog,
+  ] = await Promise.all([
+    listStockUnits(),
+    listStockProducts(),
+    listUnits(),
+    listEnvironments(),
+    listAssets(),
+    listTechnicalEntryCatalog(),
+  ])
 
-  return { items, products, units, environments }
+  return {
+    items,
+    products,
+    units,
+    environments,
+    assets,
+    catalog,
+  }
 }
 
 function Field({
   label,
+  hint,
   children,
 }: {
   label: string
+  hint?: string
   children: ReactNode
 }) {
   return (
@@ -88,8 +128,38 @@ function Field({
         {label}
       </span>
       {children}
+      {hint && (
+        <span className="mt-1.5 block text-[11px] leading-4 text-slate-400">
+          {hint}
+        </span>
+      )}
     </label>
   )
+}
+
+function locationLabel(
+  unitId: string | null,
+  environmentId: string | null,
+  unitMap: Map<string, UnitRecord>,
+  environmentMap: Map<string, EnvironmentRecord>,
+) {
+  const unit = unitMap.get(unitId ?? '')
+  const environment = environmentMap.get(
+    environmentId ?? '',
+  )
+
+  if (environment && unit) {
+    return `${unit.name} · ${environment.name}`
+  }
+
+  return environment?.name ?? unit?.name ?? 'Sem posição física'
+}
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
 }
 
 export function InventoryPage() {
@@ -101,6 +171,9 @@ export function InventoryPage() {
   const [units, setUnits] = useState<UnitRecord[]>([])
   const [environments, setEnvironments] =
     useState<EnvironmentRecord[]>([])
+  const [assets, setAssets] = useState<AssetRecord[]>([])
+  const [catalog, setCatalog] =
+    useState<TechnicalEntryCatalog>(emptyCatalog)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] =
     useState<string | null>(null)
@@ -110,8 +183,10 @@ export function InventoryPage() {
   )
   const [category, setCategory] = useState('all')
   const [createOpen, setCreateOpen] = useState(false)
+  const [locationOpen, setLocationOpen] = useState(false)
 
   const canAdjust = hasPermission('stock.adjust')
+  const canManageLocations = hasPermission('locations.manage')
 
   useEffect(() => {
     let active = true
@@ -126,6 +201,8 @@ export function InventoryPage() {
         setProducts(data.products)
         setUnits(data.units)
         setEnvironments(data.environments)
+        setAssets(data.assets)
+        setCatalog(data.catalog)
       } catch (error) {
         if (!active) return
 
@@ -155,6 +232,8 @@ export function InventoryPage() {
       setProducts(data.products)
       setUnits(data.units)
       setEnvironments(data.environments)
+      setAssets(data.assets)
+      setCatalog(data.catalog)
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -192,9 +271,9 @@ export function InventoryPage() {
     [products],
   )
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
+  const term = normalizeSearch(search.trim())
 
+  const filtered = useMemo(() => {
     return items.filter((item) => {
       const product = productMap.get(item.product_id)
 
@@ -211,21 +290,24 @@ export function InventoryPage() {
 
       if (!term) return true
 
-      const haystack = [
-        item.stock_code,
-        product?.name,
-        item.manufacturer,
-        item.model,
-        item.serial_number,
-        item.purchase_reference,
-        unitMap.get(item.current_unit_id ?? '')?.name,
-        environmentMap.get(
-          item.current_environment_id ?? '',
-        )?.name,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
+      const haystack = normalizeSearch(
+        [
+          item.stock_code,
+          product?.name,
+          item.manufacturer,
+          item.model,
+          item.serial_number,
+          item.purchase_reference,
+          locationLabel(
+            item.current_unit_id,
+            item.current_environment_id,
+            unitMap,
+            environmentMap,
+          ),
+        ]
+          .filter(Boolean)
+          .join(' '),
+      )
 
       return haystack.includes(term)
     })
@@ -234,12 +316,50 @@ export function InventoryPage() {
     environmentMap,
     items,
     productMap,
-    search,
     status,
+    term,
     unitMap,
   ])
 
-  const inStock = items.filter(
+  const stockAssets = useMemo(
+    () =>
+      assets.filter((asset) => {
+        if (asset.status !== 'stock') return false
+        if (status !== 'all' && status !== 'in_stock') {
+          return false
+        }
+        if (!term) return true
+
+        const haystack = normalizeSearch(
+          [
+            asset.asset_code,
+            asset.manufacturer,
+            asset.model,
+            asset.serial_number,
+            asset.hostname,
+            locationLabel(
+              asset.current_unit_id,
+              asset.current_environment_id,
+              unitMap,
+              environmentMap,
+            ),
+          ]
+            .filter(Boolean)
+            .join(' '),
+        )
+
+        return haystack.includes(term)
+      }),
+    [
+      assets,
+      environmentMap,
+      status,
+      term,
+      unitMap,
+    ],
+  )
+
+  const componentsInStock = items.filter(
     (item) => item.status === 'in_stock',
   ).length
   const installed = items.filter(
@@ -250,13 +370,16 @@ export function InventoryPage() {
       item.status === 'maintenance' ||
       item.condition === 'damaged',
   ).length
+  const completeAssetsInStock = assets.filter(
+    (asset) => asset.status === 'stock',
+  ).length
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Operação"
         title="Estoque"
-        description="Peças físicas, condição, localização e vínculo com máquinas."
+        description="Equipamentos completos, peças, localização física e vínculo com máquinas."
         actions={
           <div className="flex flex-wrap gap-2">
             <button
@@ -271,6 +394,17 @@ export function InventoryPage() {
               Atualizar
             </button>
 
+            {canManageLocations && (
+              <button
+                type="button"
+                onClick={() => setLocationOpen(true)}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                <MapPin size={15} />
+                Novo local de estoque
+              </button>
+            )}
+
             {canAdjust && (
               <button
                 type="button"
@@ -278,7 +412,7 @@ export function InventoryPage() {
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
               >
                 <Plus size={15} />
-                Entrada de item
+                Entrada de peça
               </button>
             )}
           </div>
@@ -291,16 +425,21 @@ export function InventoryPage() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Em estoque"
-          value={inStock}
-          detail="Disponíveis para uso"
+          label="Ativos completos"
+          value={completeAssetsInStock}
+          detail="Computadores/equipamentos disponíveis"
+        />
+        <MetricCard
+          label="Peças disponíveis"
+          value={componentsInStock}
+          detail="Itens físicos em estoque"
         />
         <MetricCard
           label="Instalados"
           value={installed}
-          detail="Vinculados a ativos"
+          detail="Componentes vinculados a ativos"
         />
         <MetricCard
           label="Atenção"
@@ -320,7 +459,7 @@ export function InventoryPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-              placeholder="Buscar código, serial, modelo ou referência"
+              placeholder="Buscar ativo, peça, serial, estante ou prateleira"
             />
           </div>
 
@@ -351,12 +490,10 @@ export function InventoryPage() {
 
           <select
             value={category}
-            onChange={(event) =>
-              setCategory(event.target.value)
-            }
+            onChange={(event) => setCategory(event.target.value)}
             className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 outline-none"
           >
-            <option value="all">Todas as categorias</option>
+            <option value="all">Todas as categorias de peças</option>
             {categories.map((value) => (
               <option key={value} value={value}>
                 {value}
@@ -370,7 +507,126 @@ export function InventoryPage() {
         <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div>
             <h2 className="text-sm font-bold text-slate-950">
-              Itens controlados
+              Ativos completos em estoque
+            </h2>
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              Computadores, monitores e outros patrimônios ainda disponíveis para uso.
+            </p>
+          </div>
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+            {stockAssets.length} exibidos
+          </span>
+        </header>
+
+        {loading ? (
+          <div className="grid min-h-36 place-items-center">
+            <RefreshCw size={18} className="animate-spin text-slate-400" />
+          </div>
+        ) : stockAssets.length === 0 ? (
+          <div className="grid min-h-36 place-items-center p-6 text-center text-xs text-slate-400">
+            Nenhum ativo completo em estoque para os filtros atuais.
+          </div>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-[820px] text-left">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
+                    <th className="px-5 py-3">Código</th>
+                    <th className="px-4 py-3">Equipamento</th>
+                    <th className="px-4 py-3">Serial</th>
+                    <th className="px-4 py-3">Local físico</th>
+                    <th className="w-12 px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stockAssets.map((asset) => (
+                    <tr key={asset.id} className="hover:bg-slate-50/70">
+                      <td className="px-5 py-4">
+                        <Link
+                          to={`/patrimonio/${asset.id}`}
+                          className="font-mono text-xs font-bold text-slate-950 hover:text-sky-700"
+                        >
+                          {asset.asset_code}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="text-sm font-semibold text-slate-800">
+                          {[asset.manufacturer, asset.model]
+                            .filter(Boolean)
+                            .join(' ') || 'Ativo'}
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-semibold text-emerald-600">
+                          Em estoque
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-xs text-slate-500">
+                        {asset.serial_number || '—'}
+                      </td>
+                      <td className="px-4 py-4 text-xs font-semibold text-slate-700">
+                        {locationLabel(
+                          asset.current_unit_id,
+                          asset.current_environment_id,
+                          unitMap,
+                          environmentMap,
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        <Link
+                          to={`/patrimonio/${asset.id}`}
+                          className="grid size-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          aria-label="Abrir ativo"
+                        >
+                          <ChevronRight size={15} />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-slate-100 lg:hidden">
+              {stockAssets.map((asset) => (
+                <Link
+                  key={asset.id}
+                  to={`/patrimonio/${asset.id}`}
+                  className="flex items-center gap-3 p-4 hover:bg-slate-50"
+                >
+                  <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700">
+                    <Monitor size={17} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-[11px] font-bold text-slate-500">
+                      {asset.asset_code}
+                    </div>
+                    <div className="truncate text-sm font-bold text-slate-900">
+                      {[asset.manufacturer, asset.model]
+                        .filter(Boolean)
+                        .join(' ') || 'Ativo'}
+                    </div>
+                    <div className="mt-1 truncate text-[11px] text-slate-400">
+                      {locationLabel(
+                        asset.current_unit_id,
+                        asset.current_environment_id,
+                        unitMap,
+                        environmentMap,
+                      )}
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-slate-300" />
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div>
+            <h2 className="text-sm font-bold text-slate-950">
+              Peças e componentes
             </h2>
             <p className="mt-0.5 text-[11px] text-slate-400">
               {filtered.length} registros exibidos
@@ -380,19 +636,16 @@ export function InventoryPage() {
 
         {loading ? (
           <div className="grid min-h-64 place-items-center">
-            <RefreshCw
-              size={18}
-              className="animate-spin text-slate-400"
-            />
+            <RefreshCw size={18} className="animate-spin text-slate-400" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="grid min-h-64 place-items-center p-8 text-center">
+          <div className="grid min-h-52 place-items-center p-8 text-center">
             <div>
               <div className="mx-auto grid size-11 place-items-center rounded-2xl bg-slate-100 text-slate-500">
                 <Boxes size={19} />
               </div>
               <div className="mt-4 text-sm font-bold text-slate-900">
-                Nenhum item encontrado
+                Nenhuma peça encontrada
               </div>
               <div className="mt-1 text-xs text-slate-500">
                 Cadastre uma peça física ou ajuste os filtros.
@@ -416,21 +669,10 @@ export function InventoryPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filtered.map((item) => {
-                    const product = productMap.get(
-                      item.product_id,
-                    )
-                    const unit = unitMap.get(
-                      item.current_unit_id ?? '',
-                    )
-                    const environment = environmentMap.get(
-                      item.current_environment_id ?? '',
-                    )
+                    const product = productMap.get(item.product_id)
 
                     return (
-                      <tr
-                        key={item.id}
-                        className="transition hover:bg-slate-50/70"
-                      >
+                      <tr key={item.id} className="transition hover:bg-slate-50/70">
                         <td className="px-5 py-4">
                           <Link
                             to={`/estoque/${item.id}`}
@@ -459,9 +701,12 @@ export function InventoryPage() {
                           <div className="text-xs font-semibold text-slate-700">
                             {item.installed_asset_id
                               ? 'Instalado em ativo'
-                              : environment?.name ??
-                                unit?.name ??
-                                'Sem local'}
+                              : locationLabel(
+                                  item.current_unit_id,
+                                  item.current_environment_id,
+                                  unitMap,
+                                  environmentMap,
+                                )}
                           </div>
                         </td>
                         <td className="px-4 py-4">
@@ -508,9 +753,14 @@ export function InventoryPage() {
                         {product?.name ?? 'Componente'}
                       </div>
                       <div className="mt-1 truncate text-[11px] text-slate-400">
-                        {[item.manufacturer, item.model, item.serial_number]
-                          .filter(Boolean)
-                          .join(' · ') || 'Sem detalhes'}
+                        {item.installed_asset_id
+                          ? 'Instalado em ativo'
+                          : locationLabel(
+                              item.current_unit_id,
+                              item.current_environment_id,
+                              unitMap,
+                              environmentMap,
+                            )}
                       </div>
                     </div>
                     <span
@@ -518,10 +768,7 @@ export function InventoryPage() {
                     >
                       {statusLabels[item.status]}
                     </span>
-                    <ChevronRight
-                      size={16}
-                      className="text-slate-300"
-                    />
+                    <ChevronRight size={16} className="text-slate-300" />
                   </Link>
                 )
               })}
@@ -535,7 +782,15 @@ export function InventoryPage() {
         products={products}
         units={units.filter((item) => item.active)}
         environments={environments.filter((item) => item.active)}
+        catalog={catalog}
         onClose={() => setCreateOpen(false)}
+        onSaved={() => void refresh()}
+      />
+
+      <StockLocationModal
+        open={locationOpen}
+        units={units.filter((item) => item.active)}
+        onClose={() => setLocationOpen(false)}
         onSaved={() => void refresh()}
       />
     </div>
@@ -571,6 +826,7 @@ function CreateStockModal({
   products,
   units,
   environments,
+  catalog,
   onClose,
   onSaved,
 }: {
@@ -578,6 +834,7 @@ function CreateStockModal({
   products: StockProductRecord[]
   units: UnitRecord[]
   environments: EnvironmentRecord[]
+  catalog: TechnicalEntryCatalog
   onClose: () => void
   onSaved: () => void
 }) {
@@ -593,8 +850,7 @@ function CreateStockModal({
   const [unitId, setUnitId] = useState('')
   const [environmentId, setEnvironmentId] = useState('')
   const [supplier, setSupplier] = useState('')
-  const [purchaseReference, setPurchaseReference] =
-    useState('')
+  const [purchaseReference, setPurchaseReference] = useState('')
   const [acquiredAt, setAcquiredAt] = useState('')
   const [warrantyUntil, setWarrantyUntil] = useState('')
   const [cost, setCost] = useState('')
@@ -621,9 +877,14 @@ function CreateStockModal({
     })
   }, [open, products])
 
-  const filteredEnvironments = environments.filter(
-    (item) => !unitId || item.unit_id === unitId,
-  )
+  const filteredEnvironments = environments
+    .filter((item) => !unitId || item.unit_id === unitId)
+    .slice()
+    .sort((a, b) => {
+      const aStock = a.environment_type === 'stock' ? 0 : 1
+      const bStock = b.environment_type === 'stock' ? 0 : 1
+      return aStock - bStock || a.name.localeCompare(b.name, 'pt-BR')
+    })
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -666,8 +927,8 @@ function CreateStockModal({
   return (
     <FormModal
       open={open}
-      title="Entrada de item"
-      description="Cada peça física recebe um código Wisdom individual."
+      title="Entrada de peça"
+      description="Registre a peça e, se quiser, já informe estante/prateleira pelo local de estoque."
       onClose={onClose}
       widthClassName="max-w-3xl"
       footer={
@@ -706,9 +967,7 @@ function CreateStockModal({
             <select
               className={inputClass}
               value={productId}
-              onChange={(event) =>
-                setProductId(event.target.value)
-              }
+              onChange={(event) => setProductId(event.target.value)}
               required
             >
               {products.map((product) => (
@@ -724,9 +983,7 @@ function CreateStockModal({
               className={inputClass}
               value={condition}
               onChange={(event) =>
-                setCondition(
-                  event.target.value as StockCondition,
-                )
+                setCondition(event.target.value as StockCondition)
               }
             >
               {Object.entries(conditionLabels).map(
@@ -742,11 +999,16 @@ function CreateStockModal({
           <Field label="Fabricante">
             <input
               className={inputClass}
+              list="m17-stock-manufacturers"
               value={manufacturer}
-              onChange={(event) =>
-                setManufacturer(event.target.value)
-              }
+              onChange={(event) => setManufacturer(event.target.value)}
+              placeholder="Pesquisar ou digitar fabricante"
             />
+            <datalist id="m17-stock-manufacturers">
+              {catalog.manufacturers.map((value) => (
+                <option key={value} value={value} />
+              ))}
+            </datalist>
           </Field>
 
           <Field label="Modelo">
@@ -769,9 +1031,7 @@ function CreateStockModal({
             <input
               className={inputClass}
               value={purchaseReference}
-              onChange={(event) =>
-                setPurchaseReference(event.target.value)
-              }
+              onChange={(event) => setPurchaseReference(event.target.value)}
               placeholder="NF, pedido ou lote"
             />
           </Field>
@@ -780,9 +1040,7 @@ function CreateStockModal({
             <input
               className={inputClass}
               value={supplier}
-              onChange={(event) =>
-                setSupplier(event.target.value)
-              }
+              onChange={(event) => setSupplier(event.target.value)}
             />
           </Field>
 
@@ -801,9 +1059,7 @@ function CreateStockModal({
               className={inputClass}
               type="date"
               value={acquiredAt}
-              onChange={(event) =>
-                setAcquiredAt(event.target.value)
-              }
+              onChange={(event) => setAcquiredAt(event.target.value)}
             />
           </Field>
 
@@ -812,15 +1068,13 @@ function CreateStockModal({
               className={inputClass}
               type="date"
               value={warrantyUntil}
-              onChange={(event) =>
-                setWarrantyUntil(event.target.value)
-              }
+              onChange={(event) => setWarrantyUntil(event.target.value)}
             />
           </Field>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Unidade de estoque">
+          <Field label="Unidade física do estoque">
             <select
               className={inputClass}
               value={unitId}
@@ -829,7 +1083,7 @@ function CreateStockModal({
                 setEnvironmentId('')
               }}
             >
-              <option value="">Sem unidade definida</option>
+              <option value="">Sem unidade física definida</option>
               {units.map((unit) => (
                 <option key={unit.id} value={unit.id}>
                   {unit.name}
@@ -838,22 +1092,23 @@ function CreateStockModal({
             </select>
           </Field>
 
-          <Field label="Ambiente de estoque">
+          <Field
+            label="Local / estante / prateleira"
+            hint="Cadastre posições em “Novo local de estoque” para reutilizar sem digitar."
+          >
             <select
               className={inputClass}
               value={environmentId}
-              onChange={(event) =>
-                setEnvironmentId(event.target.value)
-              }
+              onChange={(event) => setEnvironmentId(event.target.value)}
               disabled={!unitId}
             >
-              <option value="">Sem ambiente definido</option>
+              <option value="">Sem posição física definida</option>
               {filteredEnvironments.map((environment) => (
-                <option
-                  key={environment.id}
-                  value={environment.id}
-                >
+                <option key={environment.id} value={environment.id}>
                   {environment.name}
+                  {environment.environment_type === 'stock'
+                    ? ' · estoque'
+                    : ''}
                 </option>
               ))}
             </select>
@@ -865,6 +1120,194 @@ function CreateStockModal({
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             className="min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+          />
+        </Field>
+      </form>
+    </FormModal>
+  )
+}
+
+function StockLocationModal({
+  open,
+  units,
+  onClose,
+  onSaved,
+}: {
+  open: boolean
+  units: UnitRecord[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [unitId, setUnitId] = useState('')
+  const [area, setArea] = useState('Estoque TI')
+  const [rack, setRack] = useState('')
+  const [shelf, setShelf] = useState('')
+  const [description, setDescription] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+
+    queueMicrotask(() => {
+      setUnitId(units[0]?.id ?? '')
+      setArea('Estoque TI')
+      setRack('')
+      setShelf('')
+      setDescription('')
+      setErrorMessage(null)
+    })
+  }, [open, units])
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const parts = [area, rack, shelf]
+      .map((value) => value.trim())
+      .filter(Boolean)
+
+    if (!unitId || parts.length === 0) {
+      setErrorMessage('Informe a unidade física e o local de estoque.')
+      return
+    }
+
+    const name = parts.join(' · ')
+    const readable = parts
+      .join('-')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 18)
+
+    const code = `EST-${readable || 'LOCAL'}-${crypto
+      .randomUUID()
+      .slice(0, 4)
+      .toUpperCase()}`
+
+    try {
+      setSaving(true)
+      setErrorMessage(null)
+
+      await createEnvironment({
+        unit_id: unitId,
+        code,
+        name,
+        environment_type: 'stock',
+        description:
+          description.trim() ||
+          [
+            area.trim() && `Área: ${area.trim()}`,
+            rack.trim() && `Estante: ${rack.trim()}`,
+            shelf.trim() && `Prateleira: ${shelf.trim()}`,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        active: true,
+      })
+
+      onClose()
+      onSaved()
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível cadastrar o local.',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <FormModal
+      open={open}
+      title="Novo local de estoque"
+      description="Cadastre uma posição física reutilizável sem criar nova estrutura de banco."
+      onClose={onClose}
+      widthClassName="max-w-2xl"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="stock-location-form"
+            disabled={saving || !unitId}
+            className="h-10 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-50"
+          >
+            {saving ? 'Salvando...' : 'Cadastrar local'}
+          </button>
+        </div>
+      }
+    >
+      <form
+        id="stock-location-form"
+        onSubmit={submit}
+        className="space-y-4"
+      >
+        {errorMessage && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+            {errorMessage}
+          </div>
+        )}
+
+        <Field label="Unidade física">
+          <select
+            className={inputClass}
+            value={unitId}
+            onChange={(event) => setUnitId(event.target.value)}
+            required
+          >
+            {units.map((unit) => (
+              <option key={unit.id} value={unit.id}>
+                {unit.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Área / depósito">
+            <input
+              className={inputClass}
+              value={area}
+              onChange={(event) => setArea(event.target.value)}
+              placeholder="Estoque TI"
+            />
+          </Field>
+
+          <Field label="Estante">
+            <input
+              className={inputClass}
+              value={rack}
+              onChange={(event) => setRack(event.target.value)}
+              placeholder="Estante A"
+            />
+          </Field>
+
+          <Field label="Prateleira">
+            <input
+              className={inputClass}
+              value={shelf}
+              onChange={(event) => setShelf(event.target.value)}
+              placeholder="Prateleira 02"
+            />
+          </Field>
+        </div>
+
+        <Field label="Observações">
+          <textarea
+            className="min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Ex.: armário fechado, corredor esquerdo..."
           />
         </Field>
       </form>

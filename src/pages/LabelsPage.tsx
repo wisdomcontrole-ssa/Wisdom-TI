@@ -126,6 +126,7 @@ export function LabelsPage() {
           item.typeName,
           item.title,
           item.serial,
+          item.thirdPartyCode,
         ]
           .filter(Boolean)
           .some((value) =>
@@ -346,7 +347,7 @@ export function LabelsPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="h-11 w-full rounded-xl border border-slate-200 pl-10 pr-3 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              placeholder="Código do ativo, código curto, serial, tipo..."
+              placeholder="Código interno, Código de terceiro, serial, tipo..."
             />
           </div>
 
@@ -377,6 +378,9 @@ export function LabelsPage() {
                       )}
                       <span>{item.code}</span>
                       {item.serial && <span>SN {item.serial}</span>}
+                      {item.thirdPartyCode && (
+                        <span>Terceiro {item.thirdPartyCode}</span>
+                      )}
                     </div>
                   </div>
 
@@ -663,6 +667,12 @@ function InventoryLabel({
         {item.serial && (
           <div className="mt-[0.7mm] truncate font-mono text-[5.5pt] text-slate-500">
             SN {item.serial}
+          </div>
+        )}
+
+        {item.thirdPartyCode && (
+          <div className="mt-[0.5mm] truncate font-mono text-[5.5pt] font-bold text-slate-700">
+            Terceiro: {item.thirdPartyCode}
           </div>
         )}
 

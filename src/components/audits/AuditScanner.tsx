@@ -31,7 +31,7 @@ export function AuditScanner({
 }: Props) {
   const [scannerId] = useState(
     () =>
-      `wisdom-audit-scanner-${crypto.randomUUID()}`,
+      `inventory-audit-scanner-${crypto.randomUUID()}`,
   )
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const lockRef = useRef(false)
@@ -87,6 +87,15 @@ export function AuditScanner({
         {
           formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.CODABAR,
           ],
           verbose: false,
         },
@@ -110,21 +119,8 @@ export function AuditScanner({
       await scanner.start(
         { facingMode: 'environment' },
         {
-          fps: 10,
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const edge = Math.floor(
-              Math.min(
-                viewfinderWidth,
-                viewfinderHeight,
-              ) * 0.68,
-            )
-
-            return {
-              width: edge,
-              height: edge,
-            }
-          },
-          aspectRatio: 1,
+          fps: 12,
+          aspectRatio: 1.3333333333,
         },
         (decodedText) => {
           void dispatchScan(decodedText, 'qr')
@@ -179,7 +175,7 @@ export function AuditScanner({
       setScannerError(
         error instanceof Error
           ? error.message
-          : 'Nenhum QR Code válido foi encontrado na imagem.',
+          : 'Nenhum QR Code ou código de barras válido foi encontrado na imagem.',
       )
     }
   }
@@ -212,7 +208,7 @@ export function AuditScanner({
               Leitura do patrimônio
             </div>
             <div className="mt-0.5 text-[10px] text-slate-400">
-              Câmera, imagem ou código manual
+              Câmera, QR Code, código de barras ou código manual
             </div>
           </div>
         </div>
@@ -311,7 +307,7 @@ export function AuditScanner({
                   }
                   disabled={disabled}
                   className="h-11 w-full rounded-l-xl border border-r-0 border-slate-200 bg-white pl-9 pr-2 text-xs outline-none focus:border-sky-400 disabled:bg-slate-50"
-                  placeholder="WIS-DT-000001"
+                  placeholder="DT-000001 / serial / terceiro"
                 />
               </div>
 

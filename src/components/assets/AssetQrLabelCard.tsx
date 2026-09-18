@@ -2,8 +2,10 @@ import {
   Printer,
   QrCode as QrCodeIcon,
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import QRCode from 'react-qr-code'
 import { useBranding } from '../../branding/BrandContext'
+import { getAssetSmartProfile } from '../../data/asset-smart-service'
 import type { AssetRecord } from '../../types/assets'
 
 export function AssetQrLabelCard({
@@ -14,6 +16,52 @@ export function AssetQrLabelCard({
   typeName: string
 }) {
   const { branding } = useBranding()
+  const [thirdPartyCode, setThirdPartyCode] =
+    useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+
+    async function loadThirdPartyCode() {
+      try {
+        const profile =
+          await getAssetSmartProfile(asset.id)
+
+        if (!active) return
+
+        const preferred =
+          profile.identifiers.find(
+            (item) =>
+              item.identifier_type === 'patrimony',
+          ) ??
+          profile.identifiers.find(
+            (item) =>
+              item.identifier_type === 'tombamento',
+          ) ??
+          profile.identifiers.find(
+            (item) =>
+              item.identifier_type === 'internal_serial',
+          ) ??
+          profile.identifiers.find(
+            (item) =>
+              item.identifier_type === 'other',
+          )
+
+        setThirdPartyCode(
+          preferred?.identifier_value ?? null,
+        )
+      } catch {
+        if (active) setThirdPartyCode(null)
+      }
+    }
+
+    void loadThirdPartyCode()
+
+    return () => {
+      active = false
+    }
+  }, [asset.id])
+
   const qrTarget =
     `${window.location.origin}/ativo/${asset.asset_code}`
   const labelId = `asset-label-${asset.id}`
@@ -99,6 +147,15 @@ export function AssetQrLabelCard({
             font-size: 6.2pt;
             line-height: 1.2;
           }
+          .aux {
+            margin-top: .6mm;
+            font-family: Consolas, monospace;
+            font-size: 5.4pt;
+            line-height: 1.1;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+          }
           button { display: none !important; }
         </style>
       </head>
@@ -124,7 +181,7 @@ export function AssetQrLabelCard({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-slate-400">
           <QrCodeIcon size={14} />
-          QR patrimonial
+          QR e identificadores
         </div>
 
         <button
@@ -189,8 +246,14 @@ export function AssetQrLabelCard({
           </div>
 
           {asset.serial_number && (
-            <div className="desc mt-1 truncate font-mono text-[10px] text-slate-400">
+            <div className="aux desc mt-1 truncate font-mono text-[10px] text-slate-400">
               SN {asset.serial_number}
+            </div>
+          )}
+
+          {thirdPartyCode && (
+            <div className="aux mt-1 truncate font-mono text-[10px] font-bold text-slate-700">
+              Terceiro: {thirdPartyCode}
             </div>
           )}
         </div>

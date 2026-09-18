@@ -69,6 +69,16 @@ export interface M12StockProduct {
   can_install: boolean
 }
 
+export interface M12AssetIdentifier {
+  id: string
+  asset_id: string
+  organization_id: string | null
+  identifier_type: string
+  identifier_value: string
+  active: boolean
+  created_at: string
+}
+
 export interface M12GenericBinding {
   id: string
   asset_id: string
@@ -128,6 +138,7 @@ export interface LabelAsset {
   typeName: string
   title: string
   serial: string | null
+  thirdPartyCode: string | null
   status: string
 }
 
@@ -139,6 +150,7 @@ export interface LabelStockUnit {
   typeName: string
   title: string
   serial: string | null
+  thirdPartyCode: string | null
   status: string
 }
 

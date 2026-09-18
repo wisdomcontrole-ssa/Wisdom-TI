@@ -62,7 +62,18 @@ export function InventoryScanner({
   function ensureScanner() {
     if (!scannerRef.current) {
       scannerRef.current = new Html5Qrcode(scannerId, {
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.CODABAR,
+        ],
         verbose: false,
       })
     }
@@ -108,14 +119,8 @@ export function InventoryScanner({
       await scanner.start(
         { facingMode: 'environment' },
         {
-          fps: 10,
-          qrbox: (width, height) => {
-            const edge = Math.floor(
-              Math.min(width, height) * 0.68,
-            )
-            return { width: edge, height: edge }
-          },
-          aspectRatio: 1,
+          fps: 12,
+          aspectRatio: 1.3333333333,
         },
         (decodedText) => {
           void dispatchScan(decodedText, 'qr')
@@ -160,7 +165,7 @@ export function InventoryScanner({
       setScannerError(
         error instanceof Error
           ? error.message
-          : 'Nenhum QR Code válido foi encontrado.',
+          : 'Nenhum QR Code ou código de barras válido foi encontrado.',
       )
     }
   }
@@ -192,7 +197,7 @@ export function InventoryScanner({
               Leitor universal
             </div>
             <div className="text-xs text-slate-500">
-              QR Code, código completo ou código curto.
+              QR Code, código de barras, código de terceiro, serial ou código interno.
             </div>
           </div>
         </div>
@@ -258,7 +263,7 @@ export function InventoryScanner({
               onChange={(event) => setManualCode(event.target.value)}
               disabled={disabled}
               className="h-11 w-full rounded-l-xl border border-r-0 border-slate-200 bg-white pl-9 pr-2 font-mono text-xs uppercase outline-none focus:border-sky-400 disabled:bg-slate-50"
-              placeholder="K7M4Q2"
+              placeholder="Código / serial"
             />
           </div>
           <button

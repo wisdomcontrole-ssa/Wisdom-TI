@@ -35,6 +35,9 @@ import {
   updateAuditItemNote,
 } from '../data/audit-service'
 import {
+  resolveInventoryCode,
+} from '../data/field-ops-service'
+import {
   listAssets,
   listEnvironments,
   listUnits,
@@ -352,9 +355,21 @@ export function AuditExecutionPage() {
       setScanning(true)
       setErrorMessage(null)
 
+      let scannedValue = value
+
+      const resolved =
+        await resolveInventoryCode(value)
+
+      if (
+        resolved.kind === 'asset' &&
+        resolved.code
+      ) {
+        scannedValue = resolved.code
+      }
+
       const result = await registerAuditScan({
         auditId: audit.id,
-        scannedValue: value,
+        scannedValue,
         observedUnitId: audit.unit_id,
         observedEnvironmentId:
           observedEnvironmentId || null,
