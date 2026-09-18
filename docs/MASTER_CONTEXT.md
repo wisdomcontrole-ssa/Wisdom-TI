@@ -1,6 +1,6 @@
 # INVENTÃRIO TI â€” MASTER CONTEXT â€” INSTANCIA 1
 
-Atualizado em: 2026-09-18 13:50:52 -03:00
+Atualizado em: 2026-09-18 14:36:29 -03:00
 
 ## 1. Identidade
 
@@ -438,3 +438,25 @@ Nao alterados:
 - M17.2 teste manual local: aprovado.
 - Proximo passo: smoke test de producao nas duas instancias apos deploy Cloudflare.
 <!-- M17_2_FUNCTIONAL_END -->
+
+<!-- M17_2_THIRDPARTY_HOTFIX_BEGIN -->
+## M17.2 Hotfix — Codigo de terceiro no Novo Express
+
+Estado: validado localmente e publicado.
+
+Correcao:
+- campo Codigo de terceiro visivel no bloco principal de identificacao do Novo Express;
+- botao Ler ao lado do campo;
+- leitura por codigo de barras usando o InventoryScanner;
+- numero lido preenche diretamente o Codigo de terceiro;
+- numero de serie do fabricante continua com leitura por codigo de barras;
+- persistencia continua usando identificador externo ja existente;
+- nenhuma alteracao de banco;
+- nenhuma migration;
+- OCR/camera principal nao alterados.
+
+Validacao manual:
+- campo visivel;
+- botao Ler visivel;
+- leitura do codigo de barras preenchendo o campo aprovada.
+<!-- M17_2_THIRDPARTY_HOTFIX_END -->
