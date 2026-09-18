@@ -1,11 +1,12 @@
 import {
   Barcode,
-  Camera,
+  CheckCircle2,
   ChevronDown,
-  Loader2,
+  ChevronUp,
   PackagePlus,
   ReceiptText,
-  ScanText,
+  RefreshCw,
+  Settings2,
 } from 'lucide-react'
 import {
   useEffect,
@@ -15,12 +16,6 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  listAssetTypes,
-  listEnvironments,
-  listUnits,
-  updateAsset,
-} from '../../data/asset-service'
-import {
   addAssetExternalIdentifier,
   addPurchaseDocumentToAsset,
   ensureExternalOrganization,
@@ -28,30 +23,35 @@ import {
   setAssetSmartCore,
 } from '../../data/asset-smart-service'
 import {
+  listAssetTypes,
+  listEnvironments,
+  listUnits,
+  updateAsset,
+} from '../../data/asset-service'
+import {
   listTechnicalEntryCatalog,
   type TechnicalEntryCatalog,
 } from '../../data/entry-catalog-service'
+import {
+  createExpressAsset,
+} from '../../data/field-ops-service'
 import {
   recordOcrIntelligenceExtraction,
   setAssetTechnicalProfile,
 } from '../../data/ocr-intelligence-service'
 import {
-  buildAssetPrefill,
-  type AssetPrefill,
-  type EquipmentCategory,
-} from '../../features/ocr-intelligence'
-import {
-  analyzePurchaseDocument,
-} from '../../features/purchase-document-ocr'
-import {
   uploadEvidence,
 } from '../../data/evidence-service'
 import {
-  createExpressAsset,
-} from '../../data/field-ops-service'
+  buildAssetPrefill,
+  type AssetPrefill,
+} from '../../features/ocr-intelligence'
 import {
   prepareEvidenceFile,
 } from '../../lib/evidence-image'
+import {
+  analyzePurchaseDocument,
+} from '../../features/purchase-document-ocr'
 import type {
   AssetLabelAnalysis,
   ExternalIdentifierType,
@@ -68,14 +68,10 @@ import type {
 } from '../../types/field-ops'
 import { InventoryScanner } from '../field/InventoryScanner'
 import { FormModal } from '../ui/FormModal'
-import {
-  SmartLabelReader,
-} from './SmartLabelReader'
+import { SmartLabelReader } from './SmartLabelReader'
 
 const inputClass =
-  'h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100'
-const textareaClass =
-  'min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100'
+  'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100'
 
 const emptyCatalog: TechnicalEntryCatalog = {
   manufacturers: [],
@@ -89,6 +85,41 @@ const emptyCatalog: TechnicalEntryCatalog = {
   storageInterfaces: [],
   storageFormFactors: [],
   operatingSystems: [],
+}
+
+const entryOriginLabels: Record<
+  EntryOrigin,
+  string
+> = {
+  purchase: 'Compra',
+  donation: 'Doação',
+  used: 'Usado / já existente',
+  transfer: 'Transferência',
+  other: 'Outro',
+}
+
+const ownershipLabels: Record<
+  OwnershipType,
+  string
+> = {
+  own: 'Próprio',
+  ceded: 'Cedido para nós',
+  loaned: 'Emprestado para nós',
+  commodatum: 'Comodato',
+  leased: 'Locado',
+  third_party: 'Terceiro',
+  other: 'Outro',
+}
+
+const identifierLabels: Record<
+  ExternalIdentifierType,
+  string
+> = {
+  patrimony: 'Patrimônio / tag do terceiro',
+  tombamento: 'Tombamento do terceiro',
+  internal_serial: 'Número anterior do terceiro',
+  contract: 'Contrato / convênio',
+  other: 'Outro código de terceiro',
 }
 
 function Field({
@@ -107,7 +138,7 @@ function Field({
       </span>
       {children}
       {hint && (
-        <span className="mt-1.5 block text-[11px] leading-4 text-slate-400">
+        <span className="mt-1 block text-[10px] leading-4 text-slate-400">
           {hint}
         </span>
       )}
@@ -134,89 +165,375 @@ function Datalist({
   )
 }
 
-interface OcrSnapshot {
-  file: File
-  analysis: AssetLabelAnalysis
-}
-
-type PlacementMode = 'stock' | 'in_use'
-
-const categoryAliases: Partial<
-  Record<EquipmentCategory, string[]>
-> = {
-  desktop: ['desktop', 'computador', 'pc', 'workstation'],
-  notebook: ['notebook', 'laptop', 'ultrabook'],
-  server: ['servidor', 'server'],
-  monitor: ['monitor', 'display'],
-  printer: ['impressora', 'printer'],
-  switch: ['switch'],
-  router: ['roteador', 'router'],
-  access_point: ['access point', 'access_point', 'ap'],
-  firewall: ['firewall'],
-  ups: ['nobreak', 'ups'],
-  stabilizer: ['estabilizador', 'stabilizer'],
-  power_strip: ['filtro de linha', 'power strip'],
-  projector: ['projetor', 'projector'],
-  keyboard: ['teclado', 'keyboard'],
-  mouse: ['mouse'],
-  scanner: ['scanner'],
-  barcode_scanner: ['leitor de codigo', 'barcode scanner'],
-  webcam: ['webcam'],
-  dock: ['dock', 'docking station'],
-  nas: ['nas'],
-}
-
-function normalizeTypeToken(value: string) {
+function normalize(value: string) {
   return value
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
+    .toUpperCase()
     .trim()
 }
 
-function findTypeIdForCategory(
-  category: EquipmentCategory,
-  types: AssetTypeRecord[],
+function parseCapacityGb(
+  value: string,
 ) {
-  const aliases = categoryAliases[category] ?? []
-
-  if (aliases.length === 0) return undefined
-
-  const normalizedAliases = aliases.map(normalizeTypeToken)
-
-  return types.find((type) => {
-    const code = normalizeTypeToken(type.code)
-    const name = normalizeTypeToken(type.name)
-
-    return normalizedAliases.some(
-      (alias) =>
-        code === alias ||
-        name === alias ||
-        name.includes(alias),
+  const match = value
+    .replace(',', '.')
+    .match(
+      /(\d+(?:\.\d+)?)\s*(TB|GB|MB)\b/i,
     )
-  })?.id
+
+  if (!match) return undefined
+
+  const amount = Number(match[1])
+  if (!Number.isFinite(amount)) {
+    return undefined
+  }
+
+  const unit = match[2].toUpperCase()
+
+  if (unit === 'TB') {
+    return amount * 1024
+  }
+
+  if (unit === 'MB') {
+    return amount / 1024
+  }
+
+  return amount
 }
 
-function optionalNumber(value: string) {
-  const normalized = value
-    .trim()
-    .replace(',', '.')
+function parseSpeedMhz(
+  value: string,
+) {
+  const match = value.match(
+    /\b(\d{3,5})\s*MHZ\b/i,
+  )
 
-  if (!normalized) return undefined
+  if (!match) return undefined
 
-  const number = Number(normalized)
+  const speed = Number(match[1])
+  return Number.isFinite(speed)
+    ? speed
+    : undefined
+}
+
+function detectMemoryType(
+  value: string,
+) {
+  return value.match(
+    /\b(LPDDR5|LPDDR4X|LPDDR4|LPDDR3|DDR5|DDR4|DDR3L|DDR3|DDR2)\b/i,
+  )?.[1]?.toUpperCase()
+}
+
+function detectStorageType(
+  value: string,
+) {
+  const normalized = normalize(value)
+
+  if (
+    normalized.includes('NVME')
+  ) {
+    return 'SSD NVMe'
+  }
+
+  if (/\bSSD\b/.test(normalized)) {
+    return 'SSD'
+  }
+
+  if (
+    /\bHDD\b/.test(normalized) ||
+    /\bHD\b/.test(normalized)
+  ) {
+    return 'HDD'
+  }
+
+  if (normalized.includes('EMMC')) {
+    return 'eMMC'
+  }
+
+  return undefined
+}
+
+function detectStorageInterface(
+  value: string,
+) {
+  const normalized = normalize(value)
+
+  if (normalized.includes('NVME')) {
+    return 'NVMe'
+  }
+  if (normalized.includes('SATA')) {
+    return 'SATA'
+  }
+  if (normalized.includes('PCIE')) {
+    return 'PCIe'
+  }
+  if (normalized.includes('SAS')) {
+    return 'SAS'
+  }
+  if (normalized.includes('USB')) {
+    return 'USB'
+  }
+
+  return undefined
+}
+
+function detectProcessorManufacturer(
+  value: string,
+) {
+  const normalized = normalize(value)
+
+  if (normalized.includes('INTEL')) {
+    return 'Intel'
+  }
+  if (
+    normalized.includes('AMD') ||
+    normalized.includes('RYZEN') ||
+    normalized.includes('ATHLON')
+  ) {
+    return 'AMD'
+  }
+  if (normalized.includes('APPLE')) {
+    return 'Apple'
+  }
+  if (
+    normalized.includes('QUALCOMM')
+  ) {
+    return 'Qualcomm'
+  }
+
+  return undefined
+}
+
+function splitKnownManufacturer(
+  value: string,
+  catalog: TechnicalEntryCatalog,
+) {
+  const clean = value.trim()
+  if (!clean) {
+    return {
+      manufacturer: '',
+      model: '',
+    }
+  }
+
+  const normalized = normalize(clean)
+  const matched =
+    catalog.manufacturers.find(
+      (manufacturer) =>
+        normalized.startsWith(
+          normalize(manufacturer),
+        ),
+    )
+
+  if (!matched) {
+    return {
+      manufacturer: '',
+      model: clean,
+    }
+  }
+
+  return {
+    manufacturer: matched,
+    model: clean
+      .slice(matched.length)
+      .replace(/^[\s:;-]+/, '')
+      .trim(),
+  }
+}
+
+function numberOrUndefined(
+  value: string,
+) {
+  const clean =
+    value.trim().replace(',', '.')
+  if (!clean) return undefined
+
+  const number = Number(clean)
   return Number.isFinite(number)
     ? number
     : undefined
 }
 
-function optionalInteger(value: string) {
-  const number = optionalNumber(value)
+function integerOrUndefined(
+  value: string,
+) {
+  const number =
+    numberOrUndefined(value)
 
   return number === undefined
     ? undefined
     : Math.round(number)
+}
+
+function findTypeForPrefill(
+  types: AssetTypeRecord[],
+  prefill: AssetPrefill,
+  reviewed: ReviewedLabelData,
+) {
+  const category =
+    prefill.type &&
+    prefill.type !== 'unknown'
+      ? normalize(prefill.type)
+      : ''
+
+  const aliases: Record<
+    string,
+    string[]
+  > = {
+    DESKTOP: [
+      'DESKTOP',
+      'COMPUTADOR',
+      'PC',
+    ],
+    NOTEBOOK: [
+      'NOTEBOOK',
+      'LAPTOP',
+    ],
+    SERVER: [
+      'SERVIDOR',
+      'SERVER',
+    ],
+    MONITOR: ['MONITOR'],
+    PRINTER: [
+      'IMPRESSORA',
+      'PRINTER',
+    ],
+    SWITCH: ['SWITCH'],
+    ROUTER: [
+      'ROTEADOR',
+      'ROUTER',
+    ],
+    ACCESS_POINT: [
+      'ACCESS POINT',
+      'ACESS POINT',
+      'AP',
+    ],
+    FIREWALL: ['FIREWALL'],
+    UPS: [
+      'NOBREAK',
+      'UPS',
+    ],
+    STABILIZER: [
+      'ESTABILIZADOR',
+    ],
+    PROJECTOR: [
+      'PROJETOR',
+      'PROJECTOR',
+    ],
+    KEYBOARD: [
+      'TECLADO',
+      'KEYBOARD',
+    ],
+    MOUSE: ['MOUSE'],
+    SCANNER: ['SCANNER'],
+    WEBCAM: ['WEBCAM'],
+    NAS: ['NAS'],
+  }
+
+  const wanted =
+    aliases[category] ?? []
+
+  let match = types.find((type) => {
+    const haystack =
+      `${type.code} ${type.name}`
+        .normalize('NFD')
+        .replace(
+          /[\u0300-\u036f]/g,
+          '',
+        )
+        .toUpperCase()
+
+    return wanted.some((value) =>
+      haystack.includes(value),
+    )
+  })
+
+  if (!match) {
+    const hasComputerSpecs = Boolean(
+      reviewed.processor.trim() ||
+        reviewed.memory.trim() ||
+        reviewed.storage.trim() ||
+        prefill.processor?.model ||
+        prefill.memory?.totalGb ||
+        prefill.storage?.capacityGb,
+    )
+
+    if (hasComputerSpecs) {
+      match = types.find((type) => {
+        const haystack = normalize(
+          `${type.code} ${type.name}`,
+        )
+        return (
+          haystack.includes(
+            'DESKTOP',
+          ) ||
+          haystack.includes(
+            'COMPUTADOR',
+          ) ||
+          haystack === 'PC'
+        )
+      })
+    }
+  }
+
+  return match?.id
+}
+
+function preferredInitialType(
+  types: AssetTypeRecord[],
+) {
+  const computer = types.find((type) => {
+    const value = normalize(
+      `${type.code} ${type.name}`,
+    )
+
+    return (
+      value.includes('DESKTOP') ||
+      value.includes('COMPUTADOR')
+    )
+  })
+
+  return (
+    computer?.id ??
+    types[0]?.id ??
+    ''
+  )
+}
+
+function technicalSummary(input: {
+  processorModel: string
+  memoryTotalGb: string
+  memoryType: string
+  storageCapacityGb: string
+  storageType: string
+  operatingSystem: string
+}) {
+  return {
+    cpu:
+      input.processorModel.trim() ||
+      'Não informado',
+    memory: [
+      input.memoryTotalGb.trim()
+        ? `${input.memoryTotalGb.trim()} GB`
+        : '',
+      input.memoryType.trim(),
+    ]
+      .filter(Boolean)
+      .join(' · ') || 'Não informada',
+    storage: [
+      input.storageCapacityGb.trim()
+        ? `${input.storageCapacityGb.trim()} GB`
+        : '',
+      input.storageType.trim(),
+    ]
+      .filter(Boolean)
+      .join(' · ') ||
+      'Não informado',
+    os:
+      input.operatingSystem.trim() ||
+      'Não informado',
+  }
 }
 
 export function ExpressAssetModal({
@@ -231,102 +548,273 @@ export function ExpressAssetModal({
     warning?: string,
   ) => void
 }) {
-  const [types, setTypes] = useState<AssetTypeRecord[]>([])
-  const [units, setUnits] = useState<UnitRecord[]>([])
+  const [types, setTypes] =
+    useState<AssetTypeRecord[]>([])
+  const [units, setUnits] =
+    useState<UnitRecord[]>([])
   const [environments, setEnvironments] =
     useState<EnvironmentRecord[]>([])
   const [catalog, setCatalog] =
-    useState<TechnicalEntryCatalog>(emptyCatalog)
+    useState<TechnicalEntryCatalog>(
+      emptyCatalog,
+    )
 
-  const [typeId, setTypeId] = useState('')
-  const [serial, setSerial] = useState('')
-  const [manufacturer, setManufacturer] = useState('')
-  const [model, setModel] = useState('')
-  const [productNumber, setProductNumber] = useState('')
-  const [serviceTag, setServiceTag] = useState('')
-  const [electricalRating, setElectricalRating] = useState('')
-  const [ocrPrefill, setOcrPrefill] =
-    useState<AssetPrefill | null>(null)
+  const [loading, setLoading] =
+    useState(false)
+  const [saving, setSaving] =
+    useState(false)
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null)
+
+  const [typeId, setTypeId] =
+    useState('')
+  const [entryOrigin, setEntryOrigin] =
+    useState<EntryOrigin>('other')
+  const [manufacturer, setManufacturer] =
+    useState('')
+  const [model, setModel] =
+    useState('')
+  const [serialNumber, setSerialNumber] =
+    useState('')
+  const [serviceTag, setServiceTag] =
+    useState('')
+  const [productNumber, setProductNumber] =
+    useState('')
+  const [
+    electricalRating,
+    setElectricalRating,
+  ] = useState('')
+
+  const [
+    thirdPartyCode,
+    setThirdPartyCode,
+  ] = useState('')
+  const [
+    identifierType,
+    setIdentifierType,
+  ] =
+    useState<ExternalIdentifierType>(
+      'patrimony',
+    )
+  const [
+    serialScannerOpen,
+    setSerialScannerOpen,
+  ] = useState(false)
+  const [
+    thirdPartyScannerOpen,
+    setThirdPartyScannerOpen,
+  ] = useState(false)
+
+  const [placementMode, setPlacementMode] =
+    useState<'stock' | 'in_use'>(
+      'stock',
+    )
+  const [unitId, setUnitId] =
+    useState('')
+  const [
+    environmentId,
+    setEnvironmentId,
+  ] = useState('')
+  const [notes, setNotes] =
+    useState('')
 
   const [processorManufacturer, setProcessorManufacturer] =
     useState('')
-  const [processorModel, setProcessorModel] = useState('')
-  const [memoryTotalGb, setMemoryTotalGb] = useState('')
-  const [memoryType, setMemoryType] = useState('')
-  const [memorySpeedMhz, setMemorySpeedMhz] = useState('')
-  const [storageCapacityGb, setStorageCapacityGb] = useState('')
-  const [storageType, setStorageType] = useState('')
-  const [storageInterface, setStorageInterface] = useState('')
-  const [storageFormFactor, setStorageFormFactor] = useState('')
+  const [processorModel, setProcessorModel] =
+    useState('')
+  const [memoryTotalGb, setMemoryTotalGb] =
+    useState('')
+  const [memoryType, setMemoryType] =
+    useState('')
+  const [memorySpeedMhz, setMemorySpeedMhz] =
+    useState('')
+  const [storageCapacityGb, setStorageCapacityGb] =
+    useState('')
+  const [storageType, setStorageType] =
+    useState('')
+  const [storageInterface, setStorageInterface] =
+    useState('')
+  const [storageFormFactor, setStorageFormFactor] =
+    useState('')
   const [motherboardManufacturer, setMotherboardManufacturer] =
     useState('')
-  const [motherboardModel, setMotherboardModel] = useState('')
-  const [operatingSystem, setOperatingSystem] = useState('')
-  const [wifiManufacturer, setWifiManufacturer] = useState('')
-  const [wifiModel, setWifiModel] = useState('')
-  const [macAddress, setMacAddress] = useState('')
+  const [motherboardModel, setMotherboardModel] =
+    useState('')
+  const [operatingSystem, setOperatingSystem] =
+    useState('')
+  const [wifiManufacturer, setWifiManufacturer] =
+    useState('')
+  const [wifiModel, setWifiModel] =
+    useState('')
+  const [macAddress, setMacAddress] =
+    useState('')
 
-  const [origin, setOrigin] = useState<EntryOrigin>('purchase')
-  const [placementMode, setPlacementMode] =
-    useState<PlacementMode>('stock')
-  const [unitId, setUnitId] = useState('')
-  const [environmentId, setEnvironmentId] = useState('')
-  const [notes, setNotes] = useState('')
-  const [photo, setPhoto] = useState<File | null>(null)
+  const [technicalOpen, setTechnicalOpen] =
+    useState(false)
+  const [advancedOpen, setAdvancedOpen] =
+    useState(false)
+  const [ocrApplied, setOcrApplied] =
+    useState(false)
+  const [ocrMessage, setOcrMessage] =
+    useState<string | null>(null)
 
-  const [acquiredAt, setAcquiredAt] = useState('')
-  const [warrantyExpiresAt, setWarrantyExpiresAt] = useState('')
-
+  const [acquiredAt, setAcquiredAt] =
+    useState('')
+  const [
+    warrantyExpiresAt,
+    setWarrantyExpiresAt,
+  ] = useState('')
   const [ownershipType, setOwnershipType] =
     useState<OwnershipType>('own')
-  const [organizationName, setOrganizationName] = useState('')
-  const [organizationAcronym, setOrganizationAcronym] = useState('')
-  const [organizationCity, setOrganizationCity] = useState('')
-  const [organizationState, setOrganizationState] = useState('')
-  const [externalIdentifierType, setExternalIdentifierType] =
-    useState<ExternalIdentifierType>('patrimony')
-  const [externalIdentifierValue, setExternalIdentifierValue] =
+  const [
+    organizationName,
+    setOrganizationName,
+  ] = useState('')
+  const [
+    organizationAcronym,
+    setOrganizationAcronym,
+  ] = useState('')
+
+  const [invoiceNumber, setInvoiceNumber] =
     useState('')
-  const [serialScannerOpen, setSerialScannerOpen] =
-    useState(false)
-  const [thirdPartyScannerOpen, setThirdPartyScannerOpen] =
-    useState(false)
+  const [invoiceSeries, setInvoiceSeries] =
+    useState('')
+  const [
+    invoiceAccessKey,
+    setInvoiceAccessKey,
+  ] = useState('')
+  const [
+    invoiceIssuerName,
+    setInvoiceIssuerName,
+  ] = useState('')
+  const [
+    invoiceIssuerTaxId,
+    setInvoiceIssuerTaxId,
+  ] = useState('')
+  const [
+    invoiceIssueDate,
+    setInvoiceIssueDate,
+  ] = useState('')
+  const [
+    invoiceFile,
+    setInvoiceFile,
+  ] = useState<File | null>(null)
+  const [
+    invoiceReading,
+    setInvoiceReading,
+  ] = useState(false)
+  const [
+    invoiceProgress,
+    setInvoiceProgress,
+  ] = useState(0)
+  const [
+    invoiceError,
+    setInvoiceError,
+  ] = useState<string | null>(null)
 
-  const [invoiceNumber, setInvoiceNumber] = useState('')
-  const [invoiceSeries, setInvoiceSeries] = useState('')
-  const [invoiceAccessKey, setInvoiceAccessKey] = useState('')
-  const [invoiceIssuer, setInvoiceIssuer] = useState('')
-  const [invoiceTaxId, setInvoiceTaxId] = useState('')
-  const [invoiceDate, setInvoiceDate] = useState('')
-  const [invoiceFile, setInvoiceFile] = useState<File | null>(null)
-  const [invoiceReading, setInvoiceReading] = useState(false)
-  const [invoiceReadStatus, setInvoiceReadStatus] = useState('')
-
-  const [ocrSnapshot, setOcrSnapshot] =
-    useState<OcrSnapshot | null>(null)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null)
+  const [ocrFile, setOcrFile] =
+    useState<File | null>(null)
+  const [
+    ocrAnalysis,
+    setOcrAnalysis,
+  ] =
+    useState<AssetLabelAnalysis | null>(
+      null,
+    )
+  const [
+    ocrPrefill,
+    setOcrPrefill,
+  ] = useState<AssetPrefill | null>(null)
 
   useEffect(() => {
     if (!open) return
 
     let active = true
 
-    queueMicrotask(() => {
-      if (!active) return
+    async function bootstrap() {
+      try {
+        setLoading(true)
+        setErrorMessage(null)
 
-      setLoading(true)
-      setErrorMessage(null)
-      setSerial('')
+        const [
+          typeRows,
+          unitRows,
+          environmentRows,
+          catalogData,
+        ] = await Promise.all([
+          listAssetTypes(),
+          listUnits(),
+          listEnvironments(),
+          listTechnicalEntryCatalog(),
+        ])
+
+        if (!active) return
+
+        const activeTypes =
+          typeRows.filter(
+            (item) => item.active,
+          )
+        const activeUnits =
+          unitRows.filter(
+            (item) => item.active,
+          )
+        const activeEnvironments =
+          environmentRows.filter(
+            (item) => item.active,
+          )
+
+        setTypes(activeTypes)
+        setUnits(activeUnits)
+        setEnvironments(
+          activeEnvironments,
+        )
+        setCatalog(catalogData)
+
+        setTypeId(
+          preferredInitialType(
+            activeTypes,
+          ),
+        )
+      } catch (error) {
+        if (!active) return
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível preparar o cadastro Express.',
+        )
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void bootstrap()
+
+    return () => {
+      active = false
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+
+    queueMicrotask(() => {
+      setEntryOrigin('other')
       setManufacturer('')
       setModel('')
-      setProductNumber('')
+      setSerialNumber('')
       setServiceTag('')
+      setProductNumber('')
       setElectricalRating('')
-      setOcrPrefill(null)
+      setThirdPartyCode('')
+      setIdentifierType('patrimony')
+      setSerialScannerOpen(false)
+      setThirdPartyScannerOpen(false)
+      setPlacementMode('stock')
+      setUnitId('')
+      setEnvironmentId('')
+      setNotes('')
+
       setProcessorManufacturer('')
       setProcessorModel('')
       setMemoryTotalGb('')
@@ -342,258 +830,77 @@ export function ExpressAssetModal({
       setWifiManufacturer('')
       setWifiModel('')
       setMacAddress('')
-      setOrigin('purchase')
-      setPlacementMode('stock')
-      setUnitId('')
-      setEnvironmentId('')
-      setNotes('')
-      setPhoto(null)
+
+      setTechnicalOpen(false)
+      setAdvancedOpen(false)
+      setOcrApplied(false)
+      setOcrMessage(null)
+
       setAcquiredAt('')
       setWarrantyExpiresAt('')
       setOwnershipType('own')
       setOrganizationName('')
       setOrganizationAcronym('')
-      setOrganizationCity('')
-      setOrganizationState('')
-      setExternalIdentifierType('patrimony')
-      setExternalIdentifierValue('')
-      setSerialScannerOpen(false)
-      setThirdPartyScannerOpen(false)
+
       setInvoiceNumber('')
       setInvoiceSeries('')
       setInvoiceAccessKey('')
-      setInvoiceIssuer('')
-      setInvoiceTaxId('')
-      setInvoiceDate('')
+      setInvoiceIssuerName('')
+      setInvoiceIssuerTaxId('')
+      setInvoiceIssueDate('')
       setInvoiceFile(null)
       setInvoiceReading(false)
-      setInvoiceReadStatus('')
-      setOcrSnapshot(null)
-      setAdvancedOpen(false)
+      setInvoiceProgress(0)
+      setInvoiceError(null)
+
+      setOcrFile(null)
+      setOcrAnalysis(null)
+      setOcrPrefill(null)
+      setErrorMessage(null)
     })
-
-    async function bootstrap() {
-      try {
-        const [
-          typeRows,
-          unitRows,
-          environmentRows,
-          catalogRows,
-        ] = await Promise.all([
-          listAssetTypes(),
-          listUnits(),
-          listEnvironments(),
-          listTechnicalEntryCatalog(),
-        ])
-
-        if (!active) return
-
-        setTypes(typeRows)
-        setUnits(
-          unitRows.filter((item) => item.active),
-        )
-        setEnvironments(
-          environmentRows.filter((item) => item.active),
-        )
-        setCatalog(catalogRows)
-        setTypeId(typeRows[0]?.id ?? '')
-      } catch (error) {
-        if (!active) return
-
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : 'Não foi possível preparar o cadastro.',
-        )
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
-
-    void bootstrap()
-
-    return () => {
-      active = false
-    }
   }, [open])
 
-  const filteredEnvironments = useMemo(
-    () =>
-      environments.filter(
-        (item) => item.unit_id === unitId,
-      ),
-    [environments, unitId],
-  )
+  const filteredEnvironments =
+    useMemo(() => {
+      const rows = environments.filter(
+        (environment) =>
+          !unitId ||
+          environment.unit_id === unitId,
+      )
 
-  const stockEnvironments = useMemo(
-    () =>
-      filteredEnvironments
-        .slice()
-        .sort((a, b) => {
-          const aStock = a.environment_type === 'stock' ? 0 : 1
-          const bStock = b.environment_type === 'stock' ? 0 : 1
+      return [...rows].sort(
+        (left, right) => {
+          const leftStock =
+            left.environment_type ===
+            'stock'
+              ? 0
+              : 1
+          const rightStock =
+            right.environment_type ===
+            'stock'
+              ? 0
+              : 1
 
-          return (
-            aStock - bStock ||
-            a.name.localeCompare(b.name, 'pt-BR')
-          )
-        }),
-    [filteredEnvironments],
-  )
+          if (leftStock !== rightStock) {
+            return leftStock - rightStock
+          }
 
-  function applyOcr(
-    data: ReviewedLabelData,
-    file: File,
-    analysis: AssetLabelAnalysis,
-  ) {
-    const intelligenceInput = [
-      data.processor && `Processador: ${data.processor}`,
-      data.memory && `Memória: ${data.memory}`,
-      data.storage && `Armazenamento: ${data.storage}`,
-      data.motherboard && `Placa-mãe: ${data.motherboard}`,
-      data.operatingSystem &&
-        `Sistema operacional: ${data.operatingSystem}`,
-      data.networkAdapter && `Rede/Wi-Fi: ${data.networkAdapter}`,
-      analysis.rawText,
-    ]
-      .filter((value): value is string => Boolean(value))
-      .join('\n')
-
-    const prefill = buildAssetPrefill(intelligenceInput)
-
-    setOcrPrefill(prefill)
-    setManufacturer(
-      data.manufacturer ||
-        prefill.manufacturer ||
-        '',
-    )
-    setModel(
-      data.model ||
-        prefill.model ||
-        '',
-    )
-    setSerial(
-      data.serialNumber ||
-        prefill.serialNumber ||
-        '',
-    )
-    setServiceTag(data.serviceTag)
-    setProductNumber(
-      data.productNumber ||
-        prefill.partNumber ||
-        prefill.sku ||
-        '',
-    )
-    setElectricalRating(data.electricalRating)
-
-    setProcessorManufacturer(
-      prefill.processor?.manufacturer ?? '',
-    )
-    setProcessorModel(
-      prefill.processor?.model ?? '',
-    )
-    setMemoryTotalGb(
-      prefill.memory?.totalGb !== undefined
-        ? String(prefill.memory.totalGb)
-        : '',
-    )
-    setMemoryType(prefill.memory?.type ?? '')
-    setMemorySpeedMhz(
-      prefill.memory?.speedMhz !== undefined
-        ? String(prefill.memory.speedMhz)
-        : '',
-    )
-    setStorageCapacityGb(
-      prefill.storage?.capacityGb !== undefined
-        ? String(prefill.storage.capacityGb)
-        : '',
-    )
-    setStorageType(prefill.storage?.type ?? '')
-    setStorageInterface(prefill.storage?.interface ?? '')
-    setStorageFormFactor(prefill.storage?.formFactor ?? '')
-    setMotherboardManufacturer(
-      prefill.motherboard?.manufacturer ?? '',
-    )
-    setMotherboardModel(
-      prefill.motherboard?.model ?? '',
-    )
-    setOperatingSystem(prefill.operatingSystem ?? '')
-    setWifiManufacturer(prefill.wifi?.manufacturer ?? '')
-    setWifiModel(prefill.wifi?.model ?? '')
-    setMacAddress(prefill.macAddress ?? '')
-
-    const inferredTypeId = findTypeIdForCategory(
-      prefill.type ?? 'unknown',
-      types,
-    )
-
-    if (inferredTypeId) {
-      setTypeId(inferredTypeId)
-    }
-
-    setNotes((current) => {
-      const cleanCurrent = current
-        .replace(
-          /(?:\r?\n)?\[OCR NÃO CLASSIFICADO\][\s\S]*?\[\/OCR NÃO CLASSIFICADO\](?:\r?\n)?/g,
-          '\n',
-        )
-        .trim()
-
-      const remaining = prefill.observations?.trim()
-
-      if (!remaining) return cleanCurrent
-
-      return [
-        cleanCurrent,
-        '[OCR NÃO CLASSIFICADO]',
-        remaining,
-        '[/OCR NÃO CLASSIFICADO]',
-      ]
-        .filter(Boolean)
-        .join('\n')
-    })
-
-    setPhoto(file)
-    setOcrSnapshot({ file, analysis })
-  }
-
-  async function readInvoice(file: File) {
-    try {
-      setInvoiceReading(true)
-      setInvoiceReadStatus('Preparando leitura')
-      setErrorMessage(null)
-      setInvoiceFile(file)
-
-      const result = await analyzePurchaseDocument(
-        file,
-        (progress, status) => {
-          setInvoiceReadStatus(
-            `${status} · ${Math.round(progress * 100)}%`,
+          return left.name.localeCompare(
+            right.name,
+            'pt-BR',
           )
         },
       )
+    }, [environments, unitId])
 
-      if (result.number) setInvoiceNumber(result.number)
-      if (result.series) setInvoiceSeries(result.series)
-      if (result.accessKey) setInvoiceAccessKey(result.accessKey)
-      if (result.issuerName) setInvoiceIssuer(result.issuerName)
-      if (result.issuerTaxId) setInvoiceTaxId(result.issuerTaxId)
-      if (result.issueDate) setInvoiceDate(result.issueDate)
-
-      setInvoiceReadStatus(
-        'Leitura concluída. Revise os campos antes de salvar.',
-      )
-    } catch (error) {
-      setInvoiceReadStatus('')
-      setErrorMessage(
-        error instanceof Error
-          ? `Nota fiscal: ${error.message}`
-          : 'Não foi possível ler a nota fiscal.',
-      )
-    } finally {
-      setInvoiceReading(false)
-    }
-  }
+  const summary = technicalSummary({
+    processorModel,
+    memoryTotalGb,
+    memoryType,
+    storageCapacityGb,
+    storageType,
+    operatingSystem,
+  })
 
   const hasTechnicalData = Boolean(
     processorManufacturer.trim() ||
@@ -613,17 +920,301 @@ export function ExpressAssetModal({
       macAddress.trim(),
   )
 
+  function applyOcr(
+    reviewed: ReviewedLabelData,
+    file: File,
+    analysis: AssetLabelAnalysis,
+  ) {
+    const structuredText = [
+      reviewed.manufacturer
+        ? `FABRICANTE ${reviewed.manufacturer}`
+        : '',
+      reviewed.model
+        ? `MODELO ${reviewed.model}`
+        : '',
+      reviewed.serialNumber
+        ? `SERIAL ${reviewed.serialNumber}`
+        : '',
+      reviewed.productNumber
+        ? `PART NUMBER ${reviewed.productNumber}`
+        : '',
+      reviewed.processor
+        ? `PROCESSADOR ${reviewed.processor}`
+        : '',
+      reviewed.memory
+        ? `MEMORIA ${reviewed.memory}`
+        : '',
+      reviewed.storage
+        ? `ARMAZENAMENTO ${reviewed.storage}`
+        : '',
+      reviewed.motherboard
+        ? `PLACA-MAE ${reviewed.motherboard}`
+        : '',
+      reviewed.operatingSystem
+        ? `SISTEMA OPERACIONAL ${reviewed.operatingSystem}`
+        : '',
+      reviewed.networkAdapter
+        ? `WIFI ${reviewed.networkAdapter}`
+        : '',
+      analysis.rawText,
+    ]
+      .filter(Boolean)
+      .join('\n')
+
+    const prefill =
+      buildAssetPrefill(structuredText)
+
+    const cpuText =
+      reviewed.processor.trim()
+    const memoryText =
+      reviewed.memory.trim()
+    const storageText =
+      reviewed.storage.trim()
+    const motherboardText =
+      reviewed.motherboard.trim()
+    const networkText =
+      reviewed.networkAdapter.trim()
+
+    const board =
+      splitKnownManufacturer(
+        motherboardText,
+        catalog,
+      )
+    const network =
+      splitKnownManufacturer(
+        networkText,
+        catalog,
+      )
+
+    setManufacturer(
+      reviewed.manufacturer.trim() ||
+        prefill.manufacturer ||
+        '',
+    )
+    setModel(
+      reviewed.model.trim() ||
+        prefill.model ||
+        '',
+    )
+    setSerialNumber(
+      reviewed.serialNumber.trim() ||
+        prefill.serialNumber ||
+        '',
+    )
+    setServiceTag(
+      reviewed.serviceTag.trim(),
+    )
+    setProductNumber(
+      reviewed.productNumber.trim() ||
+        prefill.partNumber ||
+        '',
+    )
+    setElectricalRating(
+      reviewed.electricalRating.trim(),
+    )
+
+    setProcessorManufacturer(
+      detectProcessorManufacturer(
+        cpuText,
+      ) ||
+        prefill.processor
+          ?.manufacturer ||
+        '',
+    )
+    setProcessorModel(
+      cpuText ||
+        prefill.processor?.model ||
+        '',
+    )
+
+    const directMemory =
+      parseCapacityGb(memoryText)
+    setMemoryTotalGb(
+      directMemory !== undefined
+        ? String(directMemory)
+        : prefill.memory?.totalGb !==
+            undefined
+          ? String(
+              prefill.memory.totalGb,
+            )
+          : '',
+    )
+    setMemoryType(
+      detectMemoryType(memoryText) ||
+        prefill.memory?.type ||
+        '',
+    )
+    const directMemorySpeed =
+      parseSpeedMhz(memoryText)
+    setMemorySpeedMhz(
+      directMemorySpeed !== undefined
+        ? String(directMemorySpeed)
+        : prefill.memory?.speedMhz !==
+            undefined
+          ? String(
+              prefill.memory.speedMhz,
+            )
+          : '',
+    )
+
+    const directStorage =
+      parseCapacityGb(storageText)
+    setStorageCapacityGb(
+      directStorage !== undefined
+        ? String(directStorage)
+        : prefill.storage
+              ?.capacityGb !==
+            undefined
+          ? String(
+              prefill.storage
+                .capacityGb,
+            )
+          : '',
+    )
+    setStorageType(
+      detectStorageType(storageText) ||
+        prefill.storage?.type ||
+        '',
+    )
+    setStorageInterface(
+      detectStorageInterface(
+        storageText,
+      ) ||
+        prefill.storage?.interface ||
+        '',
+    )
+    setStorageFormFactor(
+      prefill.storage?.formFactor ||
+        '',
+    )
+
+    setMotherboardManufacturer(
+      board.manufacturer ||
+        prefill.motherboard
+          ?.manufacturer ||
+        '',
+    )
+    setMotherboardModel(
+      board.model ||
+        motherboardText ||
+        prefill.motherboard?.model ||
+        '',
+    )
+
+    setOperatingSystem(
+      reviewed.operatingSystem.trim() ||
+        prefill.operatingSystem ||
+        '',
+    )
+    setWifiManufacturer(
+      network.manufacturer ||
+        prefill.wifi?.manufacturer ||
+        '',
+    )
+    setWifiModel(
+      network.model ||
+        networkText ||
+        prefill.wifi?.model ||
+        '',
+    )
+    setMacAddress(
+      prefill.macAddress || '',
+    )
+
+    const suggestedTypeId =
+      findTypeForPrefill(
+        types,
+        prefill,
+        reviewed,
+      )
+
+    if (suggestedTypeId) {
+      setTypeId(suggestedTypeId)
+    }
+
+    setOcrFile(file)
+    setOcrAnalysis(analysis)
+    setOcrPrefill(prefill)
+    setOcrApplied(true)
+    setTechnicalOpen(false)
+    setOcrMessage(
+      'Dados revisados aplicados ao cadastro. Confira identificação e configuração técnica antes de salvar.',
+    )
+  }
+
+  async function readInvoice(
+    file: File,
+  ) {
+    setInvoiceFile(file)
+    setInvoiceError(null)
+
+    if (!file.type.startsWith('image/')) {
+      setInvoiceError(
+        'PDF foi anexado. O preenchimento automático é feito apenas em imagens/fotos.',
+      )
+      return
+    }
+
+    try {
+      setInvoiceReading(true)
+      setInvoiceProgress(0)
+
+      const result =
+        await analyzePurchaseDocument(
+          file,
+          (progress) =>
+            setInvoiceProgress(progress),
+        )
+
+      setInvoiceNumber(
+        result.number || invoiceNumber,
+      )
+      setInvoiceSeries(
+        result.series || invoiceSeries,
+      )
+      setInvoiceAccessKey(
+        result.accessKey ||
+          invoiceAccessKey,
+      )
+      setInvoiceIssuerName(
+        result.issuerName ||
+          invoiceIssuerName,
+      )
+      setInvoiceIssuerTaxId(
+        result.issuerTaxId ||
+          invoiceIssuerTaxId,
+      )
+      setInvoiceIssueDate(
+        result.issueDate ||
+          invoiceIssueDate,
+      )
+    } catch (error) {
+      setInvoiceError(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível preencher a nota fiscal.',
+      )
+    } finally {
+      setInvoiceReading(false)
+    }
+  }
+
   async function submit(
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault()
 
     if (!typeId) {
-      setErrorMessage('Selecione o tipo do ativo.')
+      setErrorMessage(
+        'Selecione o tipo do ativo.',
+      )
       return
     }
 
-    if (placementMode === 'in_use' && !unitId) {
+    if (
+      placementMode === 'in_use' &&
+      !unitId
+    ) {
       setErrorMessage(
         'Para equipamento em uso, selecione a unidade inicial.',
       )
@@ -635,8 +1226,9 @@ export function ExpressAssetModal({
       !organizationName.trim()
     ) {
       setErrorMessage(
-        'Informe a instituição responsável pelo equipamento cedido, emprestado ou de terceiro.',
+        'Informe a instituição proprietária/responsável para ativo não próprio.',
       )
+      setAdvancedOpen(true)
       return
     }
 
@@ -644,88 +1236,113 @@ export function ExpressAssetModal({
       setSaving(true)
       setErrorMessage(null)
 
-      const asset = await createExpressAsset({
-        assetTypeId: typeId,
-        manufacturer,
-        model,
-        serialNumber: serial,
-        entryOrigin: origin,
-        unitId: unitId || undefined,
-        environmentId: environmentId || undefined,
-        notes,
-      })
+      const created =
+        await createExpressAsset({
+          assetTypeId: typeId,
+          manufacturer,
+          model,
+          serialNumber,
+          entryOrigin,
+          unitId:
+            unitId || undefined,
+          environmentId:
+            environmentId || undefined,
+          notes,
+        })
 
       const warnings: string[] = []
 
-      if (placementMode === 'in_use') {
+      if (
+        placementMode === 'in_use'
+      ) {
         try {
-          await updateAsset(asset.id, {
+          await updateAsset(created.id, {
             asset_type_id: typeId,
             manufacturer,
             model,
-            serial_number: serial,
+            serial_number:
+              serialNumber,
+            hostname: '',
+            os_name:
+              operatingSystem,
             status: 'active',
+            acquired_at:
+              acquiredAt,
             notes,
-            acquired_at: acquiredAt || undefined,
           })
         } catch (error) {
           warnings.push(
             error instanceof Error
-              ? `Situação inicial: ${error.message}`
-              : 'Não foi possível marcar o ativo como em uso.',
+              ? `Ativo criado, mas não foi possível marcar como em uso: ${error.message}`
+              : 'Ativo criado, mas não foi possível marcar como em uso.',
           )
         }
       }
 
-      let organizationId: string | null = null
+      let externalOrganizationId:
+        | string
+        | null = null
 
-      if (organizationName.trim()) {
+      if (
+        organizationName.trim()
+      ) {
         try {
-          organizationId =
+          externalOrganizationId =
             await ensureExternalOrganization({
               name: organizationName,
-              acronym: organizationAcronym,
-              city: organizationCity,
-              state: organizationState,
+              acronym:
+                organizationAcronym,
             })
         } catch (error) {
           warnings.push(
             error instanceof Error
-              ? `Instituição: ${error.message}`
-              : 'Não foi possível registrar a instituição.',
+              ? `Instituição não vinculada: ${error.message}`
+              : 'Instituição não vinculada.',
           )
         }
       }
 
       try {
         await setAssetSmartCore({
-          assetId: asset.id,
+          assetId: created.id,
           productNumber,
           serviceTag,
           electricalRating,
           acquiredAt,
           warrantyExpiresAt,
           ownershipType,
-          ownerOrganizationId: organizationId,
+          ownerOrganizationId:
+            ownershipType === 'own'
+              ? null
+              : externalOrganizationId,
         })
       } catch (error) {
         warnings.push(
           error instanceof Error
-            ? `Dados complementares: ${error.message}`
-            : 'Dados complementares não foram salvos.',
+            ? `Dados complementares não salvos: ${error.message}`
+            : 'Dados complementares não salvos.',
         )
       }
 
       if (hasTechnicalData) {
         try {
           await setAssetTechnicalProfile({
-            assetId: asset.id,
+            assetId: created.id,
             processorManufacturer,
             processorModel,
-            memoryTotalGb: optionalNumber(memoryTotalGb),
+            memoryTotalGb:
+              numberOrUndefined(
+                memoryTotalGb,
+              ),
             memoryType,
-            memorySpeedMhz: optionalInteger(memorySpeedMhz),
-            storageCapacityGb: optionalNumber(storageCapacityGb),
+            memorySpeedMhz:
+              integerOrUndefined(
+                memorySpeedMhz,
+              ),
+            storageCapacityGb:
+              numberOrUndefined(
+                storageCapacityGb,
+              ),
             storageType,
             storageInterface,
             storageFormFactor,
@@ -735,13 +1352,31 @@ export function ExpressAssetModal({
             wifiManufacturer,
             wifiModel,
             macAddress,
-            source: ocrPrefill ? 'ocr' : 'manual',
+            source: ocrPrefill
+              ? 'ocr'
+              : 'manual',
           })
         } catch (error) {
           warnings.push(
             error instanceof Error
-              ? `Perfil técnico: ${error.message}`
-              : 'Perfil técnico não foi salvo.',
+              ? `Configuração técnica não salva: ${error.message}`
+              : 'Configuração técnica não salva.',
+          )
+        }
+      } else if (operatingSystem.trim()) {
+        try {
+          await setAssetTechnicalProfile({
+            assetId: created.id,
+            operatingSystem,
+            source: ocrPrefill
+              ? 'ocr'
+              : 'manual',
+          })
+        } catch (error) {
+          warnings.push(
+            error instanceof Error
+              ? `Sistema operacional não salvo: ${error.message}`
+              : 'Sistema operacional não salvo.',
           )
         }
       }
@@ -749,147 +1384,157 @@ export function ExpressAssetModal({
       if (ocrPrefill) {
         try {
           await recordOcrIntelligenceExtraction({
-            assetId: asset.id,
-            extraction: ocrPrefill.extraction,
+            assetId: created.id,
+            extraction:
+              ocrPrefill.extraction,
           })
         } catch (error) {
           warnings.push(
             error instanceof Error
-              ? `Rastreabilidade OCR: ${error.message}`
-              : 'Rastreabilidade OCR não foi salva.',
+              ? `Histórico da interpretação OCR não salvo: ${error.message}`
+              : 'Histórico da interpretação OCR não salvo.',
           )
         }
       }
 
-      if (externalIdentifierValue.trim()) {
+      if (thirdPartyCode.trim()) {
         try {
           await addAssetExternalIdentifier({
-            assetId: asset.id,
-            organizationId,
-            identifierType: externalIdentifierType,
-            identifierValue: externalIdentifierValue,
+            assetId: created.id,
+            organizationId:
+              externalOrganizationId,
+            identifierType,
+            identifierValue:
+              thirdPartyCode,
+            notes:
+              'Código de terceiro informado no cadastro Express.',
           })
         } catch (error) {
           warnings.push(
             error instanceof Error
-              ? `Código de terceiro: ${error.message}`
-              : 'Código de terceiro não foi salvo.',
+              ? `Código de terceiro não vinculado: ${error.message}`
+              : 'Código de terceiro não vinculado.',
           )
         }
       }
 
-      let labelEvidenceId: string | null = null
-      const labelPhoto = ocrSnapshot?.file ?? photo
-
-      if (labelPhoto) {
+      if (
+        ocrFile &&
+        ocrAnalysis
+      ) {
         try {
-          const prepared = await prepareEvidenceFile(labelPhoto)
-          const evidence = await uploadEvidence({
-            context: { assetId: asset.id },
-            file: prepared,
-            categoryCode: 'registration',
-            captureMethod: 'camera',
-            caption: ocrSnapshot
-              ? 'Etiqueta original analisada pelo OCR'
-              : 'Foto do pré-cadastro Express',
-          })
+          const prepared =
+            await prepareEvidenceFile(
+              ocrFile,
+            )
 
-          labelEvidenceId = evidence.id
-        } catch (error) {
-          warnings.push(
-            error instanceof Error
-              ? `Foto da etiqueta: ${error.message}`
-              : 'Foto da etiqueta não foi enviada.',
-          )
-        }
-      }
-
-      if (ocrSnapshot) {
-        try {
-          const confidence = Object.fromEntries(
-            Object.entries(ocrSnapshot.analysis.fields).map(
-              ([key, value]) => [
-                key,
-                value
-                  ? {
-                      score: value.score,
-                      confidence: value.confidence,
-                      requiresReview: value.requiresReview,
-                    }
-                  : null,
-              ],
-            ),
-          )
-
-          await recordAssetLabelRead({
-            assetId: asset.id,
-            evidenceId: labelEvidenceId,
-            engine: ocrSnapshot.analysis.engine,
-            engineVersion: ocrSnapshot.analysis.engineVersion,
-            rawText: ocrSnapshot.analysis.rawText,
-            barcodes: ocrSnapshot.analysis.barcodes,
-            detectedData: ocrSnapshot.analysis.fields,
-            confidence,
-          })
-        } catch (error) {
-          warnings.push(
-            error instanceof Error
-              ? `Histórico OCR: ${error.message}`
-              : 'Histórico OCR não foi registrado.',
-          )
-        }
-      }
-
-      if (invoiceNumber.trim()) {
-        let invoiceEvidenceId: string | null = null
-
-        if (invoiceFile) {
-          try {
-            const prepared = await prepareEvidenceFile(invoiceFile)
-            const evidence = await uploadEvidence({
-              context: { assetId: asset.id },
+          const evidence =
+            await uploadEvidence({
+              context: {
+                assetId: created.id,
+              },
               file: prepared,
-              categoryCode: 'other',
-              captureMethod: invoiceFile.type.startsWith('image/')
-                ? 'camera'
-                : 'file',
-              caption: `Documento fiscal ${invoiceNumber.trim()}`,
+              categoryCode:
+                'registration',
+              captureMethod: 'camera',
+              caption:
+                'Etiqueta de identificação lida no cadastro Express',
             })
 
-            invoiceEvidenceId = evidence.id
-          } catch (error) {
-            warnings.push(
-              error instanceof Error
-                ? `Arquivo da nota fiscal: ${error.message}`
-                : 'Arquivo da nota fiscal não foi enviado.',
-            )
-          }
-        }
-
-        try {
-          await addPurchaseDocumentToAsset({
-            assetId: asset.id,
-            documentType: 'invoice',
-            number: invoiceNumber,
-            series: invoiceSeries,
-            accessKey: invoiceAccessKey,
-            issuerName: invoiceIssuer,
-            issuerTaxId: invoiceTaxId,
-            issueDate: invoiceDate,
-            evidenceId: invoiceEvidenceId,
+          await recordAssetLabelRead({
+            assetId: created.id,
+            evidenceId: evidence.id,
+            rawText:
+              ocrAnalysis.rawText,
+            barcodes:
+              ocrAnalysis.barcodes,
+            detectedData:
+              ocrAnalysis.fields,
+            confidence: Object.fromEntries(
+              Object.entries(
+                ocrAnalysis.fields,
+              ).map(
+                ([key, field]) => [
+                  key,
+                  field?.confidence ??
+                    null,
+                ],
+              ),
+            ),
+            engine:
+              ocrAnalysis.engine,
+            engineVersion:
+              ocrAnalysis.engineVersion,
           })
         } catch (error) {
           warnings.push(
             error instanceof Error
-              ? `Nota fiscal: ${error.message}`
-              : 'Nota fiscal não foi vinculada.',
+              ? `Leitura da etiqueta não foi anexada ao histórico: ${error.message}`
+              : 'Leitura da etiqueta não foi anexada ao histórico.',
+          )
+        }
+      }
+
+      if (
+        invoiceNumber.trim()
+      ) {
+        try {
+          let evidenceId:
+            | string
+            | null = null
+
+          if (invoiceFile) {
+            const prepared =
+              await prepareEvidenceFile(
+                invoiceFile,
+              )
+
+            const evidence =
+              await uploadEvidence({
+                context: {
+                  assetId: created.id,
+                },
+                file: prepared,
+                categoryCode: 'other',
+                captureMethod:
+                  'file',
+                caption:
+                  `Documento fiscal ${invoiceNumber.trim()}`,
+              })
+
+            evidenceId =
+              evidence.id
+          }
+
+          await addPurchaseDocumentToAsset({
+            assetId: created.id,
+            documentType: 'invoice',
+            number:
+              invoiceNumber,
+            series:
+              invoiceSeries,
+            accessKey:
+              invoiceAccessKey,
+            issuerName:
+              invoiceIssuerName,
+            issuerTaxId:
+              invoiceIssuerTaxId,
+            issueDate:
+              invoiceIssueDate,
+            evidenceId,
+          })
+        } catch (error) {
+          warnings.push(
+            error instanceof Error
+              ? `Nota fiscal não vinculada: ${error.message}`
+              : 'Nota fiscal não vinculada.',
           )
         }
       }
 
       onCreated(
-        asset.id,
-        warnings.length > 0
+        created.id,
+        warnings.length
           ? warnings.join('\n')
           : undefined,
       )
@@ -897,7 +1542,7 @@ export function ExpressAssetModal({
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'Não foi possível criar o pré-cadastro.',
+          : 'Não foi possível cadastrar o ativo.',
       )
     } finally {
       setSaving(false)
@@ -908,442 +1553,682 @@ export function ExpressAssetModal({
     <FormModal
       open={open}
       title="Novo ativo Express"
-      description="Cadastro rápido com OCR, catálogos assistidos, localização de estoque e leitura de nota fiscal."
+      description="Leia a etiqueta, confirme os dados principais e salve. O restante pode ser complementado depois."
       onClose={onClose}
-      widthClassName="max-w-4xl"
+      widthClassName="max-w-5xl"
       footer={
         <div className="flex w-full gap-2">
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="h-11 flex-1 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-40"
+            className="h-11 flex-1 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 disabled:opacity-50"
           >
             Cancelar
           </button>
-
           <button
             type="submit"
-            form="m17-express-form"
-            disabled={saving || loading || !typeId}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40"
+            form="express-asset-form"
+            disabled={
+              saving ||
+              loading ||
+              !typeId
+            }
+            className="inline-flex h-11 flex-[1.4] items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-black text-white disabled:opacity-50"
           >
             <PackagePlus size={16} />
-            {saving ? 'Cadastrando...' : 'Criar pré-cadastro'}
+            {saving
+              ? 'Salvando…'
+              : 'Cadastrar ativo'}
           </button>
         </div>
       }
     >
       <form
-        id="m17-express-form"
-        onSubmit={(event) => void submit(event)}
+        id="express-asset-form"
+        onSubmit={(event) =>
+          void submit(event)
+        }
         className="space-y-5"
       >
         {errorMessage && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {errorMessage}
           </div>
         )}
 
-        <SmartLabelReader
-          disabled={saving}
-          onApply={applyOcr}
-        />
-
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">
-            Código interno do patrimônio
-          </div>
-          <div className="mt-1 text-sm font-semibold text-slate-800">
-            Gerado automaticamente ao salvar
-          </div>
-          <div className="mt-1 text-xs leading-5 text-slate-500">
-            Padrão TIPO-000000. Códigos antigos continuam reconhecidos por compatibilidade.
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Tipo do ativo">
-            <select
-              className={inputClass}
-              value={typeId}
-              onChange={(event) => setTypeId(event.target.value)}
-              required
-            >
-              {types.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Origem da entrada">
-            <select
-              className={inputClass}
-              value={origin}
-              onChange={(event) =>
-                setOrigin(event.target.value as EntryOrigin)
-              }
-            >
-              <option value="purchase">Compra</option>
-              <option value="donation">Doação</option>
-              <option value="used">Equipamento usado</option>
-              <option value="transfer">Transferência</option>
-              <option value="other">Outra origem</option>
-            </select>
-          </Field>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="Fabricante"
-            hint="Escolha uma sugestão ou digite outro fabricante. Valores já usados também passam a aparecer nas próximas buscas."
-          >
-            <input
-              className={inputClass}
-              list="m17-manufacturers"
-              value={manufacturer}
-              onChange={(event) => setManufacturer(event.target.value)}
-              placeholder="Pesquisar ou digitar fabricante"
-            />
-            <Datalist
-              id="m17-manufacturers"
-              values={catalog.manufacturers}
-            />
-          </Field>
-
-          <Field label="Modelo">
-            <input
-              className={inputClass}
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              placeholder="Modelo do equipamento"
-            />
-          </Field>
-
-          <Field
-            label="Número de série do fabricante"
-            hint="Pode ser digitado ou lido diretamente do código de barras original do equipamento."
-          >
-            <div className="flex gap-2">
-              <input
-                className={inputClass}
-                value={serial}
-                onChange={(event) => setSerial(event.target.value)}
-                autoCapitalize="characters"
+        {!ocrApplied ? (
+          <SmartLabelReader
+            disabled={saving}
+            onApply={applyOcr}
+          />
+        ) : (
+          <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <CheckCircle2
+                size={19}
+                className="mt-0.5 shrink-0 text-emerald-700"
               />
-              <button
-                type="button"
-                onClick={() =>
-                  setSerialScannerOpen((current) => !current)
-                }
-                className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700"
-              >
-                <Barcode size={15} />
-                Ler
-              </button>
-            </div>
-          </Field>
-
-          {serialScannerOpen && (
-            <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-2 text-xs font-bold text-slate-700">
-                Ler número de série
+              <div>
+                <div className="text-sm font-black text-emerald-950">
+                  Leitura aplicada ao cadastro
+                </div>
+                <div className="mt-1 text-xs leading-5 text-emerald-800">
+                  {ocrMessage}
+                </div>
               </div>
-              <InventoryScanner
-                compact
-                onScan={async (value) => {
-                  setSerial(value)
-                  setSerialScannerOpen(false)
-                }}
-              />
             </div>
-          )}
+            <button
+              type="button"
+              onClick={() => {
+                setOcrApplied(false)
+                setOcrMessage(null)
+              }}
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 text-xs font-bold text-emerald-800"
+            >
+              <RefreshCw size={13} />
+              Refazer leitura
+            </button>
+          </div>
+        )}
 
-          <Field label="Código de serviço do fabricante (opcional)">
-            <input
-              className={inputClass}
-              value={serviceTag}
-              onChange={(event) => setServiceTag(event.target.value)}
-              autoCapitalize="characters"
-            />
-          </Field>
-
-          <Field label="Código do produto/peça do fabricante (opcional)">
-            <input
-              className={inputClass}
-              value={productNumber}
-              onChange={(event) => setProductNumber(event.target.value)}
-            />
-          </Field>
-
-          <Field label="Alimentação / tensão">
-            <input
-              className={inputClass}
-              value={electricalRating}
-              onChange={(event) => setElectricalRating(event.target.value)}
-              placeholder="Ex.: 100-240V · 50/60Hz"
-            />
-          </Field>
-        </div>
-
-        <section className="rounded-2xl border border-sky-200 bg-sky-50/40 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-xs font-black uppercase tracking-[0.08em] text-sky-700">
-                Configuração técnica
-              </div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                O OCR preenche quando conseguir. Se não detectar, escolha uma sugestão ou digite manualmente.
-              </p>
+        <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="mb-4">
+            <div className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">
+              Identificação principal
             </div>
-            {ocrPrefill && (
-              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
-                OCR aplicado
-              </span>
-            )}
+            <div className="mt-1 text-[11px] leading-5 text-slate-400">
+              Código interno e QR Code serão gerados automaticamente. Serial e Código de terceiro podem ser lidos por código de barras.
+            </div>
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Fabricante do processador">
-              <input
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Tipo do ativo">
+              <select
                 className={inputClass}
-                list="m17-cpu-manufacturers"
-                value={processorManufacturer}
+                value={typeId}
                 onChange={(event) =>
-                  setProcessorManufacturer(event.target.value)
+                  setTypeId(
+                    event.target.value,
+                  )
                 }
-                placeholder="Intel, AMD..."
+                required
+              >
+                <option value="">
+                  Selecione
+                </option>
+                {types.map((type) => (
+                  <option
+                    key={type.id}
+                    value={type.id}
+                  >
+                    {type.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Origem">
+              <select
+                className={inputClass}
+                value={entryOrigin}
+                onChange={(event) =>
+                  setEntryOrigin(
+                    event.target
+                      .value as EntryOrigin,
+                  )
+                }
+              >
+                {Object.entries(
+                  entryOriginLabels,
+                ).map(
+                  ([value, label]) => (
+                    <option
+                      key={value}
+                      value={value}
+                    >
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </Field>
+
+            <Field label="Fabricante">
+              <input
+                className={inputClass}
+                list="express-manufacturers"
+                value={manufacturer}
+                onChange={(event) =>
+                  setManufacturer(
+                    event.target.value,
+                  )
+                }
+                placeholder="Ex.: Dell, HP, Daten"
               />
               <Datalist
-                id="m17-cpu-manufacturers"
-                values={catalog.processorManufacturers}
+                id="express-manufacturers"
+                values={
+                  catalog.manufacturers
+                }
               />
             </Field>
 
-            <div className="sm:col-span-1 lg:col-span-2">
-              <Field label="Processador / modelo">
+            <Field label="Modelo">
+              <input
+                className={inputClass}
+                value={model}
+                onChange={(event) =>
+                  setModel(
+                    event.target.value,
+                  )
+                }
+              />
+            </Field>
+
+            <div>
+              <div className="mb-1.5 text-xs font-semibold text-slate-700">
+                Número de série do fabricante
+              </div>
+              <div className="flex gap-2">
                 <input
                   className={inputClass}
-                  list="m17-cpu-models"
-                  value={processorModel}
+                  value={serialNumber}
                   onChange={(event) =>
-                    setProcessorModel(event.target.value)
+                    setSerialNumber(
+                      event.target.value,
+                    )
                   }
-                  placeholder="Ex.: Intel Core i5-10400"
                 />
-                <Datalist
-                  id="m17-cpu-models"
-                  values={catalog.processorModels}
-                />
-              </Field>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSerialScannerOpen(
+                      (current) =>
+                        !current,
+                    )
+                  }
+                  className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                >
+                  <Barcode size={14} />
+                  Ler
+                </button>
+              </div>
+              {serialScannerOpen && (
+                <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
+                  <InventoryScanner
+                    compact
+                    onScan={async (
+                      value,
+                    ) => {
+                      setSerialNumber(
+                        value,
+                      )
+                      setSerialScannerOpen(
+                        false,
+                      )
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
-            <Field label="Memória total (GB)">
-              <input
-                className={inputClass}
-                list="m17-memory-sizes"
-                inputMode="decimal"
-                value={memoryTotalGb}
-                onChange={(event) => setMemoryTotalGb(event.target.value)}
-                placeholder="Ex.: 8"
-              />
-              <Datalist
-                id="m17-memory-sizes"
-                values={catalog.memorySizesGb}
-              />
-            </Field>
+            <div>
+              <div className="mb-1.5 text-xs font-semibold text-slate-700">
+                Código de terceiro
+              </div>
+              <div className="flex gap-2">
+                <input
+                  className={inputClass}
+                  value={thirdPartyCode}
+                  onChange={(event) =>
+                    setThirdPartyCode(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Patrimônio/tag da empresa ou órgão"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setThirdPartyScannerOpen(
+                      (current) =>
+                        !current,
+                    )
+                  }
+                  className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-800"
+                >
+                  <Barcode size={14} />
+                  Ler
+                </button>
+              </div>
+              <div className="mt-1 text-[10px] leading-4 text-slate-400">
+                Use a plaqueta/tag fixa de quem cedeu ou doou o equipamento como identificação alternativa.
+              </div>
+              {thirdPartyScannerOpen && (
+                <div className="mt-2 rounded-xl border border-sky-200 bg-sky-50/50 p-2">
+                  <InventoryScanner
+                    compact
+                    onScan={async (
+                      value,
+                    ) => {
+                      setThirdPartyCode(
+                        value,
+                      )
+                      setThirdPartyScannerOpen(
+                        false,
+                      )
+                    }}
+                  />
+                </div>
+              )}
+            </div>
 
-            <Field label="Tipo de memória">
+            <Field label="Service Tag do fabricante">
               <input
                 className={inputClass}
-                list="m17-memory-types"
-                value={memoryType}
-                onChange={(event) => setMemoryType(event.target.value)}
-                placeholder="Ex.: DDR4"
-              />
-              <Datalist
-                id="m17-memory-types"
-                values={catalog.memoryTypes}
-              />
-            </Field>
-
-            <Field label="Velocidade da memória (MHz)">
-              <input
-                className={inputClass}
-                list="m17-memory-speeds"
-                inputMode="numeric"
-                value={memorySpeedMhz}
-                onChange={(event) => setMemorySpeedMhz(event.target.value)}
-                placeholder="Ex.: 3200"
-              />
-              <Datalist
-                id="m17-memory-speeds"
-                values={catalog.memorySpeedsMhz}
-              />
-            </Field>
-
-            <Field label="Armazenamento (GB)">
-              <input
-                className={inputClass}
-                list="m17-storage-capacities"
-                inputMode="decimal"
-                value={storageCapacityGb}
-                onChange={(event) => setStorageCapacityGb(event.target.value)}
-                placeholder="Ex.: 512"
-              />
-              <Datalist
-                id="m17-storage-capacities"
-                values={catalog.storageCapacitiesGb}
-              />
-            </Field>
-
-            <Field label="Tipo de armazenamento">
-              <input
-                className={inputClass}
-                list="m17-storage-types"
-                value={storageType}
-                onChange={(event) => setStorageType(event.target.value)}
-                placeholder="SSD, HDD..."
-              />
-              <Datalist
-                id="m17-storage-types"
-                values={catalog.storageTypes}
-              />
-            </Field>
-
-            <Field label="Interface">
-              <input
-                className={inputClass}
-                list="m17-storage-interfaces"
-                value={storageInterface}
-                onChange={(event) => setStorageInterface(event.target.value)}
-                placeholder="SATA, NVMe..."
-              />
-              <Datalist
-                id="m17-storage-interfaces"
-                values={catalog.storageInterfaces}
-              />
-            </Field>
-
-            <Field label="Formato do armazenamento">
-              <input
-                className={inputClass}
-                list="m17-storage-form-factors"
-                value={storageFormFactor}
-                onChange={(event) => setStorageFormFactor(event.target.value)}
-                placeholder='M.2, 2.5"...'
-              />
-              <Datalist
-                id="m17-storage-form-factors"
-                values={catalog.storageFormFactors}
-              />
-            </Field>
-
-            <Field label="Sistema operacional">
-              <input
-                className={inputClass}
-                list="m17-operating-systems"
-                value={operatingSystem}
-                onChange={(event) => setOperatingSystem(event.target.value)}
-                placeholder="Windows 11 Pro..."
-              />
-              <Datalist
-                id="m17-operating-systems"
-                values={catalog.operatingSystems}
-              />
-            </Field>
-
-            <Field label="Fabricante da placa-mãe">
-              <input
-                className={inputClass}
-                list="m17-manufacturers"
-                value={motherboardManufacturer}
+                value={serviceTag}
                 onChange={(event) =>
-                  setMotherboardManufacturer(event.target.value)
+                  setServiceTag(
+                    event.target.value,
+                  )
                 }
               />
             </Field>
 
-            <Field label="Modelo da placa-mãe">
+            <Field label="Product / Part Number">
               <input
                 className={inputClass}
-                value={motherboardModel}
-                onChange={(event) => setMotherboardModel(event.target.value)}
-              />
-            </Field>
-
-            <Field label="Fabricante Wi-Fi">
-              <input
-                className={inputClass}
-                list="m17-manufacturers"
-                value={wifiManufacturer}
-                onChange={(event) => setWifiManufacturer(event.target.value)}
-              />
-            </Field>
-
-            <Field label="Modelo Wi-Fi">
-              <input
-                className={inputClass}
-                value={wifiModel}
-                onChange={(event) => setWifiModel(event.target.value)}
-              />
-            </Field>
-
-            <Field label="MAC address">
-              <input
-                className={inputClass}
-                value={macAddress}
+                value={productNumber}
                 onChange={(event) =>
-                  setMacAddress(event.target.value.toUpperCase())
+                  setProductNumber(
+                    event.target.value,
+                  )
                 }
-                placeholder="AA:BB:CC:DD:EE:FF"
+              />
+            </Field>
+
+            <Field label="Alimentação">
+              <input
+                className={inputClass}
+                value={electricalRating}
+                onChange={(event) =>
+                  setElectricalRating(
+                    event.target.value,
+                  )
+                }
               />
             </Field>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 p-4">
-          <div className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <button
+            type="button"
+            onClick={() =>
+              setTechnicalOpen(
+                (current) => !current,
+              )
+            }
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="grid size-9 place-items-center rounded-xl bg-slate-100 text-slate-600">
+                <Settings2 size={16} />
+              </div>
+              <div>
+                <div className="text-sm font-black text-slate-900">
+                  Configuração técnica
+                </div>
+                <div className="mt-0.5 text-[11px] text-slate-400">
+                  {hasTechnicalData
+                    ? `${summary.cpu} · ${summary.memory} · ${summary.storage} · ${summary.os}`
+                    : 'Nenhuma configuração identificada. Abra para preencher manualmente.'}
+                </div>
+              </div>
+            </div>
+
+            {technicalOpen ? (
+              <ChevronUp
+                size={16}
+                className="shrink-0 text-slate-400"
+              />
+            ) : (
+              <ChevronDown
+                size={16}
+                className="shrink-0 text-slate-400"
+              />
+            )}
+          </button>
+
+          {technicalOpen && (
+            <div className="border-t border-slate-100 p-4">
+              <div className="mb-4 rounded-xl bg-sky-50 px-3 py-2 text-[11px] leading-5 text-sky-800">
+                Os dados reconhecidos já aparecem preenchidos abaixo. Use estas opções apenas para revisar ou completar o que faltou.
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="Fabricante do processador">
+                  <input
+                    className={inputClass}
+                    list="express-cpu-manufacturers"
+                    value={
+                      processorManufacturer
+                    }
+                    onChange={(event) =>
+                      setProcessorManufacturer(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <Datalist
+                    id="express-cpu-manufacturers"
+                    values={
+                      catalog.processorManufacturers
+                    }
+                  />
+                </Field>
+
+                <div className="lg:col-span-2">
+                  <Field label="Processador / modelo">
+                    <input
+                      className={inputClass}
+                      list="express-cpu-models"
+                      value={processorModel}
+                      onChange={(event) =>
+                        setProcessorModel(
+                          event.target.value,
+                        )
+                      }
+                    />
+                    <Datalist
+                      id="express-cpu-models"
+                      values={
+                        catalog.processorModels
+                      }
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Memória total (GB)">
+                  <input
+                    className={inputClass}
+                    list="express-memory-sizes"
+                    inputMode="decimal"
+                    value={memoryTotalGb}
+                    onChange={(event) =>
+                      setMemoryTotalGb(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <Datalist
+                    id="express-memory-sizes"
+                    values={
+                      catalog.memorySizesGb
+                    }
+                  />
+                </Field>
+
+                <Field label="Tipo de memória">
+                  <input
+                    className={inputClass}
+                    list="express-memory-types"
+                    value={memoryType}
+                    onChange={(event) =>
+                      setMemoryType(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <Datalist
+                    id="express-memory-types"
+                    values={
+                      catalog.memoryTypes
+                    }
+                  />
+                </Field>
+
+                <Field label="Velocidade RAM (MHz)">
+                  <input
+                    className={inputClass}
+                    list="express-memory-speeds"
+                    inputMode="numeric"
+                    value={memorySpeedMhz}
+                    onChange={(event) =>
+                      setMemorySpeedMhz(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <Datalist
+                    id="express-memory-speeds"
+                    values={
+                      catalog.memorySpeedsMhz
+                    }
+                  />
+                </Field>
+
+                <Field label="Armazenamento (GB)">
+                  <input
+                    className={inputClass}
+                    list="express-storage-capacities"
+                    inputMode="decimal"
+                    value={
+                      storageCapacityGb
+                    }
+                    onChange={(event) =>
+                      setStorageCapacityGb(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <Datalist
+                    id="express-storage-capacities"
+                    values={
+                      catalog.storageCapacitiesGb
+                    }
+                  />
+                </Field>
+
+                <Field label="Tipo de armazenamento">
+                  <input
+                    className={inputClass}
+                    list="express-storage-types"
+                    value={storageType}
+                    onChange={(event) =>
+                      setStorageType(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <Datalist
+                    id="express-storage-types"
+                    values={
+                      catalog.storageTypes
+                    }
+                  />
+                </Field>
+
+                <Field label="Interface">
+                  <input
+                    className={inputClass}
+                    list="express-storage-interfaces"
+                    value={
+                      storageInterface
+                    }
+                    onChange={(event) =>
+                      setStorageInterface(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <Datalist
+                    id="express-storage-interfaces"
+                    values={
+                      catalog.storageInterfaces
+                    }
+                  />
+                </Field>
+
+                <Field label="Formato">
+                  <input
+                    className={inputClass}
+                    list="express-storage-form-factors"
+                    value={
+                      storageFormFactor
+                    }
+                    onChange={(event) =>
+                      setStorageFormFactor(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <Datalist
+                    id="express-storage-form-factors"
+                    values={
+                      catalog.storageFormFactors
+                    }
+                  />
+                </Field>
+
+                <Field label="Sistema operacional">
+                  <input
+                    className={inputClass}
+                    list="express-operating-systems"
+                    value={
+                      operatingSystem
+                    }
+                    onChange={(event) =>
+                      setOperatingSystem(
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <Datalist
+                    id="express-operating-systems"
+                    values={
+                      catalog.operatingSystems
+                    }
+                  />
+                </Field>
+
+                <Field label="Fabricante da placa-mãe">
+                  <input
+                    className={inputClass}
+                    list="express-manufacturers"
+                    value={
+                      motherboardManufacturer
+                    }
+                    onChange={(event) =>
+                      setMotherboardManufacturer(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </Field>
+
+                <Field label="Modelo da placa-mãe">
+                  <input
+                    className={inputClass}
+                    value={
+                      motherboardModel
+                    }
+                    onChange={(event) =>
+                      setMotherboardModel(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </Field>
+
+                <Field label="Fabricante Wi-Fi / rede">
+                  <input
+                    className={inputClass}
+                    list="express-manufacturers"
+                    value={
+                      wifiManufacturer
+                    }
+                    onChange={(event) =>
+                      setWifiManufacturer(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </Field>
+
+                <Field label="Modelo Wi-Fi / rede">
+                  <input
+                    className={inputClass}
+                    value={wifiModel}
+                    onChange={(event) =>
+                      setWifiModel(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </Field>
+
+                <Field label="MAC address">
+                  <input
+                    className={inputClass}
+                    value={macAddress}
+                    onChange={(event) =>
+                      setMacAddress(
+                        event.target.value.toUpperCase(),
+                      )
+                    }
+                    placeholder="AA:BB:CC:DD:EE:FF"
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="mb-3 text-xs font-black uppercase tracking-[0.08em] text-slate-500">
             Destino inicial
           </div>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Diferencie equipamento guardado no estoque de equipamento já em uso.
-          </p>
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
-              onClick={() => setPlacementMode('stock')}
-              className={`rounded-xl border p-3 text-left transition ${
+              onClick={() =>
+                setPlacementMode('stock')
+              }
+              className={`rounded-xl border p-3 text-left ${
                 placementMode === 'stock'
-                  ? 'border-emerald-300 bg-emerald-50'
+                  ? 'border-sky-300 bg-sky-50'
                   : 'border-slate-200 bg-white'
               }`}
             >
-              <div className="text-sm font-bold text-slate-900">
+              <div className="text-sm font-black text-slate-900">
                 Estoque
               </div>
-              <div className="mt-1 text-xs text-slate-500">
-                Computador/equipamento disponível, ainda sem uso em unidade.
+              <div className="mt-1 text-[10px] leading-4 text-slate-500">
+                Equipamento completo ainda não está em uso.
               </div>
             </button>
 
             <button
               type="button"
-              onClick={() => setPlacementMode('in_use')}
-              className={`rounded-xl border p-3 text-left transition ${
+              onClick={() =>
+                setPlacementMode(
+                  'in_use',
+                )
+              }
+              className={`rounded-xl border p-3 text-left ${
                 placementMode === 'in_use'
-                  ? 'border-sky-300 bg-sky-50'
+                  ? 'border-emerald-300 bg-emerald-50'
                   : 'border-slate-200 bg-white'
               }`}
             >
-              <div className="text-sm font-bold text-slate-900">
+              <div className="text-sm font-black text-slate-900">
                 Em uso
               </div>
-              <div className="mt-1 text-xs text-slate-500">
-                Já será associado a uma unidade física.
+              <div className="mt-1 text-[10px] leading-4 text-slate-500">
+                Equipamento já ficará ativo na unidade escolhida.
               </div>
             </button>
           </div>
@@ -1352,7 +2237,7 @@ export function ExpressAssetModal({
             <Field
               label={
                 placementMode === 'stock'
-                  ? 'Unidade física onde fica o estoque (opcional)'
+                  ? 'Unidade / depósito (opcional)'
                   : 'Unidade inicial'
               }
             >
@@ -1360,17 +2245,22 @@ export function ExpressAssetModal({
                 className={inputClass}
                 value={unitId}
                 onChange={(event) => {
-                  setUnitId(event.target.value)
+                  setUnitId(
+                    event.target.value,
+                  )
                   setEnvironmentId('')
                 }}
               >
                 <option value="">
                   {placementMode === 'stock'
-                    ? 'Estoque sem unidade física definida'
-                    : 'Selecione a unidade'}
+                    ? 'Sem unidade definida'
+                    : 'Selecione'}
                 </option>
                 {units.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
+                  <option
+                    key={unit.id}
+                    value={unit.id}
+                  >
                     {unit.name}
                   </option>
                 ))}
@@ -1380,367 +2270,347 @@ export function ExpressAssetModal({
             <Field
               label={
                 placementMode === 'stock'
-                  ? 'Local / estante / prateleira (opcional)'
+                  ? 'Posição física no estoque'
                   : 'Ambiente inicial'
-              }
-              hint={
-                placementMode === 'stock'
-                  ? 'Locais de estoque podem ser cadastrados na tela Estoque.'
-                  : undefined
               }
             >
               <select
                 className={inputClass}
                 value={environmentId}
+                onChange={(event) =>
+                  setEnvironmentId(
+                    event.target.value,
+                  )
+                }
                 disabled={!unitId}
-                onChange={(event) => setEnvironmentId(event.target.value)}
               >
                 <option value="">
-                  {placementMode === 'stock'
-                    ? 'Sem posição física definida'
-                    : 'Sem ambiente definido'}
+                  {unitId
+                    ? 'Sem ambiente definido'
+                    : 'Selecione primeiro a unidade'}
                 </option>
-                {stockEnvironments.map((environment) => (
-                  <option key={environment.id} value={environment.id}>
-                    {environment.name}
-                    {environment.environment_type === 'stock'
-                      ? ' · estoque'
-                      : ''}
-                  </option>
-                ))}
+                {filteredEnvironments.map(
+                  (environment) => (
+                    <option
+                      key={
+                        environment.id
+                      }
+                      value={
+                        environment.id
+                      }
+                    >
+                      {environment
+                        .environment_type ===
+                      'stock'
+                        ? 'Estoque · '
+                        : ''}
+                      {
+                        environment.name
+                      }
+                    </option>
+                  ),
+                )}
               </select>
             </Field>
           </div>
         </section>
 
-        <Field label="Observação rápida">
+        <Field
+          label="Observações do técnico"
+          hint="Somente observações úteis. Texto bruto do OCR é guardado no histórico de leitura, não neste campo."
+        >
           <textarea
-            className={textareaClass}
+            className="min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
             value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Ex.: recebido na portaria, NF pendente, doação..."
+            onChange={(event) =>
+              setNotes(
+                event.target.value,
+              )
+            }
           />
         </Field>
 
-        {!ocrSnapshot && (
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-semibold text-slate-700">
-              Foto do recebimento
-            </span>
-            <div className="flex min-h-20 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3">
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm">
-                <Camera size={17} />
-                {photo ? 'Trocar foto' : 'Tirar foto'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(event) =>
-                    setPhoto(event.currentTarget.files?.[0] ?? null)
-                  }
-                />
-              </label>
-            </div>
-          </label>
-        )}
-
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((current) => !current)}
-          className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
-        >
-          <div>
-            <div className="text-sm font-black text-slate-900">
-              Aquisição, garantia e código de terceiro
-            </div>
-            <div className="mt-1 text-xs text-slate-500">
-              Nota fiscal, garantia, posse e código de terceiro.
-            </div>
-          </div>
-          <ChevronDown
-            size={17}
-            className={`transition ${advancedOpen ? 'rotate-180' : ''}`}
-          />
-        </button>
-
-        {advancedOpen && (
-          <div className="space-y-5 rounded-2xl border border-slate-200 p-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Data de aquisição">
-                <input
-                  type="date"
-                  className={inputClass}
-                  value={acquiredAt}
-                  onChange={(event) => setAcquiredAt(event.target.value)}
-                />
-              </Field>
-
-              <Field label="Garantia até">
-                <input
-                  type="date"
-                  className={inputClass}
-                  value={warrantyExpiresAt}
-                  onChange={(event) =>
-                    setWarrantyExpiresAt(event.target.value)
-                  }
-                />
-              </Field>
-            </div>
-
-            <div className="border-t border-slate-100 pt-4">
-              <div className="text-xs font-black uppercase tracking-[0.08em] text-slate-400">
-                Posse / custódia e código de terceiro
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <button
+            type="button"
+            onClick={() =>
+              setAdvancedOpen(
+                (current) => !current,
+              )
+            }
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+          >
+            <div>
+              <div className="text-sm font-black text-slate-900">
+                Aquisição, custódia e nota fiscal
               </div>
+              <div className="mt-0.5 text-[11px] text-slate-400">
+                Informações opcionais. O Código de terceiro já fica no cadastro principal.
+              </div>
+            </div>
+            {advancedOpen ? (
+              <ChevronUp
+                size={16}
+                className="text-slate-400"
+              />
+            ) : (
+              <ChevronDown
+                size={16}
+                className="text-slate-400"
+              />
+            )}
+          </button>
 
-              <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                <Field label="Situação">
+          {advancedOpen && (
+            <div className="space-y-5 border-t border-slate-100 p-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="Data de aquisição">
+                  <input
+                    type="date"
+                    className={inputClass}
+                    value={acquiredAt}
+                    onChange={(event) =>
+                      setAcquiredAt(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </Field>
+
+                <Field label="Garantia até">
+                  <input
+                    type="date"
+                    className={inputClass}
+                    value={
+                      warrantyExpiresAt
+                    }
+                    onChange={(event) =>
+                      setWarrantyExpiresAt(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </Field>
+
+                <Field label="Posse / custódia">
                   <select
                     className={inputClass}
                     value={ownershipType}
                     onChange={(event) =>
                       setOwnershipType(
-                        event.target.value as OwnershipType,
+                        event.target
+                          .value as OwnershipType,
                       )
                     }
                   >
-                    <option value="own">Próprio</option>
-                    <option value="ceded">Cedido para nós</option>
-                    <option value="loaned">Emprestado para nós</option>
-                    <option value="commodatum">Comodato</option>
-                    <option value="leased">Locado</option>
-                    <option value="third_party">Terceiro</option>
-                    <option value="other">Outro</option>
+                    {Object.entries(
+                      ownershipLabels,
+                    ).map(
+                      ([value, label]) => (
+                        <option
+                          key={value}
+                          value={value}
+                        >
+                          {label}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </Field>
 
-                <Field label="Instituição responsável/de origem (quando houver)">
+                <Field label="Instituição proprietária / origem">
                   <input
                     className={inputClass}
-                    value={organizationName}
-                    onChange={(event) =>
-                      setOrganizationName(event.target.value)
+                    value={
+                      organizationName
                     }
-                    placeholder="Nome do órgão/instituição"
+                    onChange={(event) =>
+                      setOrganizationName(
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Ex.: Prefeitura, empresa, órgão"
                   />
                 </Field>
 
-                <Field label="Sigla">
+                <Field label="Sigla da instituição">
                   <input
                     className={inputClass}
-                    value={organizationAcronym}
-                    onChange={(event) =>
-                      setOrganizationAcronym(event.target.value)
+                    value={
+                      organizationAcronym
                     }
-                  />
-                </Field>
-
-                <Field label="Cidade">
-                  <input
-                    className={inputClass}
-                    value={organizationCity}
                     onChange={(event) =>
-                      setOrganizationCity(event.target.value)
-                    }
-                  />
-                </Field>
-
-                <Field label="UF">
-                  <input
-                    className={inputClass}
-                    maxLength={2}
-                    value={organizationState}
-                    onChange={(event) =>
-                      setOrganizationState(
-                        event.target.value.toUpperCase(),
+                      setOrganizationAcronym(
+                        event.target.value,
                       )
                     }
                   />
                 </Field>
 
-                <Field
-                  label="Classificação do código de terceiro"
-                  hint="A classificação mantém a rastreabilidade histórica; o campo principal é sempre tratado no sistema como Código de terceiro."
-                >
+                <Field label="Classificação do Código de terceiro">
                   <select
                     className={inputClass}
-                    value={externalIdentifierType}
+                    value={identifierType}
                     onChange={(event) =>
-                      setExternalIdentifierType(
-                        event.target.value as ExternalIdentifierType,
+                      setIdentifierType(
+                        event.target
+                          .value as ExternalIdentifierType,
                       )
                     }
                   >
-                    <option value="patrimony">Código patrimonial do terceiro</option>
-                    <option value="tombamento">Tombamento do terceiro</option>
-                    <option value="internal_serial">Código interno do terceiro / anterior</option>
-                    <option value="contract">Contrato / convênio</option>
-                    <option value="other">Outro código de terceiro</option>
+                    {Object.entries(
+                      identifierLabels,
+                    ).map(
+                      ([value, label]) => (
+                        <option
+                          key={value}
+                          value={value}
+                        >
+                          {label}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </Field>
+              </div>
 
-                <div className="sm:col-span-2">
-                  <Field
-                    label="Código de terceiro (opcional)"
-                    hint="Use o número da plaqueta, etiqueta patrimonial ou código de barras da empresa/órgão que cedeu o equipamento."
-                  >
-                    <div className="flex gap-2">
-                      <input
-                        className={inputClass}
-                        value={externalIdentifierValue}
-                        onChange={(event) =>
-                          setExternalIdentifierValue(event.target.value)
-                        }
-                        placeholder="Ex.: 00457821"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setThirdPartyScannerOpen((current) => !current)
-                        }
-                        className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700"
-                      >
-                        <Barcode size={15} />
-                        Ler
-                      </button>
-                    </div>
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-slate-500">
+                  <ReceiptText size={14} />
+                  Nota fiscal / documento de aquisição
+                </div>
+
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <Field label="Número">
+                    <input
+                      className={inputClass}
+                      value={
+                        invoiceNumber
+                      }
+                      onChange={(event) =>
+                        setInvoiceNumber(
+                          event.target.value,
+                        )
+                      }
+                    />
                   </Field>
 
-                  {thirdPartyScannerOpen && (
-                    <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="mb-2 text-xs font-bold text-slate-700">
-                        Ler código de terceiro
-                      </div>
-                      <InventoryScanner
-                        compact
-                        onScan={async (value) => {
-                          setExternalIdentifierValue(value)
-                          setThirdPartyScannerOpen(false)
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-slate-100 pt-4">
-              <div className="flex items-center gap-2">
-                <ReceiptText size={15} className="text-slate-500" />
-                <div className="text-xs font-black uppercase tracking-[0.08em] text-slate-400">
-                  Nota fiscal
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50/60 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-bold text-slate-800">
-                      Preenchimento por foto
-                    </div>
-                    <div className="mt-1 text-[11px] leading-4 text-slate-500">
-                      Usa o mesmo OCR local já utilizado na etiqueta. Revise os campos antes de salvar.
-                    </div>
-                  </div>
-
-                  <label className={`inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-white px-3 text-xs font-bold text-slate-700 shadow-sm ${invoiceReading ? 'pointer-events-none opacity-60' : ''}`}>
-                    {invoiceReading ? (
-                      <Loader2 size={15} className="animate-spin" />
-                    ) : (
-                      <ScanText size={15} />
-                    )}
-                    {invoiceReading
-                      ? 'Lendo...'
-                      : 'Fotografar e preencher'}
+                  <Field label="Série">
                     <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      disabled={invoiceReading}
-                      onChange={(event) => {
-                        const file = event.currentTarget.files?.[0]
-                        if (file) void readInvoice(file)
-                        event.currentTarget.value = ''
-                      }}
+                      className={inputClass}
+                      value={
+                        invoiceSeries
+                      }
+                      onChange={(event) =>
+                        setInvoiceSeries(
+                          event.target.value,
+                        )
+                      }
                     />
-                  </label>
+                  </Field>
+
+                  <Field label="Data de emissão">
+                    <input
+                      type="date"
+                      className={inputClass}
+                      value={
+                        invoiceIssueDate
+                      }
+                      onChange={(event) =>
+                        setInvoiceIssueDate(
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Emitente">
+                    <input
+                      className={inputClass}
+                      value={
+                        invoiceIssuerName
+                      }
+                      onChange={(event) =>
+                        setInvoiceIssuerName(
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </Field>
+
+                  <Field label="CNPJ/CPF">
+                    <input
+                      className={inputClass}
+                      value={
+                        invoiceIssuerTaxId
+                      }
+                      onChange={(event) =>
+                        setInvoiceIssuerTaxId(
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Chave NF-e">
+                    <input
+                      className={inputClass}
+                      value={
+                        invoiceAccessKey
+                      }
+                      onChange={(event) =>
+                        setInvoiceAccessKey(
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </Field>
                 </div>
 
-                {invoiceReadStatus && (
-                  <div className="mt-2 text-[11px] font-semibold text-sky-700">
-                    {invoiceReadStatus}
+                <label className="mt-4 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 text-xs font-bold text-slate-700">
+                  <ReceiptText size={15} />
+                  {invoiceReading
+                    ? `Lendo documento… ${Math.round(
+                        invoiceProgress *
+                          100,
+                      )}%`
+                    : invoiceFile
+                      ? `Arquivo: ${invoiceFile.name}`
+                      : 'Fotografar ou anexar nota fiscal'}
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    capture="environment"
+                    className="hidden"
+                    disabled={
+                      invoiceReading
+                    }
+                    onChange={(event) => {
+                      const selected =
+                        event.currentTarget
+                          .files?.[0]
+
+                      if (selected) {
+                        void readInvoice(
+                          selected,
+                        )
+                      }
+
+                      event.currentTarget.value =
+                        ''
+                    }}
+                  />
+                </label>
+
+                {invoiceError && (
+                  <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800">
+                    {invoiceError}
                   </div>
                 )}
               </div>
-
-              <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                <Field label="Número">
-                  <input
-                    className={inputClass}
-                    value={invoiceNumber}
-                    onChange={(event) => setInvoiceNumber(event.target.value)}
-                  />
-                </Field>
-
-                <Field label="Série">
-                  <input
-                    className={inputClass}
-                    value={invoiceSeries}
-                    onChange={(event) => setInvoiceSeries(event.target.value)}
-                  />
-                </Field>
-
-                <Field label="Data de emissão">
-                  <input
-                    type="date"
-                    className={inputClass}
-                    value={invoiceDate}
-                    onChange={(event) => setInvoiceDate(event.target.value)}
-                  />
-                </Field>
-
-                <Field label="Emitente">
-                  <input
-                    className={inputClass}
-                    value={invoiceIssuer}
-                    onChange={(event) => setInvoiceIssuer(event.target.value)}
-                  />
-                </Field>
-
-                <Field label="CNPJ/CPF emitente">
-                  <input
-                    className={inputClass}
-                    value={invoiceTaxId}
-                    onChange={(event) => setInvoiceTaxId(event.target.value)}
-                  />
-                </Field>
-
-                <Field label="Chave NF-e">
-                  <input
-                    className={inputClass}
-                    value={invoiceAccessKey}
-                    onChange={(event) => setInvoiceAccessKey(event.target.value)}
-                  />
-                </Field>
-              </div>
-
-              <label className="mt-4 block">
-                <span className="mb-1.5 block text-xs font-semibold text-slate-700">
-                  Foto/PDF da nota
-                </span>
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  className="block w-full rounded-xl border border-slate-200 bg-white p-2 text-xs"
-                  onChange={(event) =>
-                    setInvoiceFile(event.currentTarget.files?.[0] ?? null)
-                  }
-                />
-              </label>
             </div>
-          </div>
-        )}
+          )}
+        </section>
       </form>
     </FormModal>
   )

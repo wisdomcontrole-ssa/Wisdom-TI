@@ -3,6 +3,28 @@ import type {
   OcrInterpretation,
 } from '../features/ocr-intelligence'
 
+export interface AssetTechnicalProfileRecord {
+  asset_id: string
+  processor_manufacturer: string | null
+  processor_model: string | null
+  memory_total_gb: number | null
+  memory_type: string | null
+  memory_speed_mhz: number | null
+  storage_capacity_gb: number | null
+  storage_type: string | null
+  storage_interface: string | null
+  storage_form_factor: string | null
+  motherboard_manufacturer: string | null
+  motherboard_model: string | null
+  wifi_manufacturer: string | null
+  wifi_model: string | null
+  mac_address: string | null
+  source: string
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 function client() {
   if (!supabase) {
     throw new Error(
@@ -19,6 +41,44 @@ function throwIfError(
   if (error) {
     throw new Error(error.message)
   }
+}
+
+export async function getAssetTechnicalProfile(
+  assetId: string,
+) {
+  const { data, error } = await client()
+    .from('asset_technical_profiles')
+    .select(
+      [
+        'asset_id',
+        'processor_manufacturer',
+        'processor_model',
+        'memory_total_gb',
+        'memory_type',
+        'memory_speed_mhz',
+        'storage_capacity_gb',
+        'storage_type',
+        'storage_interface',
+        'storage_form_factor',
+        'motherboard_manufacturer',
+        'motherboard_model',
+        'wifi_manufacturer',
+        'wifi_model',
+        'mac_address',
+        'source',
+        'updated_by',
+        'created_at',
+        'updated_at',
+      ].join(', '),
+    )
+    .eq('asset_id', assetId)
+    .maybeSingle()
+
+  throwIfError(error)
+
+  return data
+    ? (data as unknown as AssetTechnicalProfileRecord)
+    : null
 }
 
 export async function setAssetTechnicalProfile(input: {

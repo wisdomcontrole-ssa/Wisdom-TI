@@ -1,6 +1,6 @@
 # INVENTÃRIO TI â€” MASTER CONTEXT â€” INSTANCIA 1
 
-Atualizado em: 2026-09-18 09:29:14 -03:00
+Atualizado em: 2026-09-18 13:50:52 -03:00
 
 ## 1. Identidade
 
@@ -385,3 +385,56 @@ Testes:
 10. em auditoria física, ler Código de terceiro/serial e confirmar o mesmo ativo;
 11. confirmar câmera/OCR de etiqueta sem regressão.
 <!-- M17_TRACEABILITY_END -->
+
+<!-- M17_2_FUNCTIONAL_BEGIN -->
+## M17.2 — Coerencia do cadastro tecnico e ficha do ativo
+
+Estado: M17.2 validada localmente e pronta para publicacao; aguardando smoke test de producao.
+
+Instancia:
+- Supabase ref: dqfbzsneaamihfphjfcj
+- Supabase URL: https://dqfbzsneaamihfphjfcj.supabase.co
+- GitHub: https://github.com/wisdomcontrole-ssa/Wisdom-TI.git
+- Cloudflare: https://inventario-ti-8s6.pages.dev
+
+### Entregue
+- Express reorganizado: leitura OCR -> revisao -> aplicacao direta dos dados.
+- Texto bruto/nao classificado do OCR nao e mais gravado automaticamente em ssets.notes.
+- Codigo de terceiro visivel no cadastro Express e legivel por codigo de barras.
+- Numero de serie do fabricante continua legivel por codigo de barras.
+- Perfil tecnico usa sset_technical_profiles.
+- CPU, RAM, armazenamento, sistema operacional, placa-mae e rede ficam visiveis no topo da ficha.
+- Ficha cruza Cadastrado/esperado x Detectado pelo agente.
+- Edicao do ativo inclui configuracao tecnica completa.
+- Local atual foi compactado.
+- Blocos historicos [OCR NAO CLASSIFICADO] ficam preservados nos dados, mas sao filtrados da exibicao principal.
+- Confirmacao do inventario detectado atualiza cadastro tecnico/baseline somente por acao explicita do tecnico.
+
+### Banco e backend
+- Nenhuma migration M17.2.
+- Nenhum SQL M17.2.
+- Reuso das estruturas existentes: sset_technical_profiles, set_asset_technical_profile, identificadores externos e inventario do agente.
+
+### Arquivos M17.2
+- src/data/ocr-intelligence-service.ts
+- src/components/assets/AssetTechnicalOverviewCard.tsx
+- src/components/assets/AssetEditModal.tsx
+- src/components/assets/ExpressAssetModal.tsx
+- src/pages/AssetDetailPage.tsx
+- scripts/test-m17-source.mjs
+- scripts/test-m17-traceability.mjs
+- scripts/test-m17-2-functional.mjs
+
+### Protecao
+Nao alterados:
+- src/components/assets/SmartLabelReader.tsx
+- src/lib/asset-label-ocr.ts
+- src/features/ocr-intelligence/engine.ts
+
+### Validacao
+- M17 base: aprovada.
+- M17.1 rastreabilidade: aprovada.
+- M17.2 source/build: aprovada.
+- M17.2 teste manual local: aprovado.
+- Proximo passo: smoke test de producao nas duas instancias apos deploy Cloudflare.
+<!-- M17_2_FUNCTIONAL_END -->
