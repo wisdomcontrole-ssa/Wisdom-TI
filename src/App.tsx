@@ -19,6 +19,8 @@ import { FieldScannerPage } from './pages/FieldScannerPage'
 import { IdentifyCodePage } from './pages/IdentifyCodePage'
 import { InventoryPage } from './pages/InventoryPage'
 import { LabelsPage } from './pages/LabelsPage'
+import { BlankLabelsPage } from './pages/BlankLabelsPage'
+import { QuickLabelRegistrationPage } from './pages/QuickLabelRegistrationPage'
 import { LocationsPage } from './pages/LocationsPage'
 import { LoginPage } from './pages/LoginPage'
 import { LogsPage } from './pages/LogsPage'
@@ -227,6 +229,14 @@ export default function App() {
             <Route
               path="/etiquetas"
               element={<LabelsPage />}
+            />
+            <Route
+              path="/etiquetas/antecipadas"
+              element={<BlankLabelsPage />}
+            />
+            <Route
+              path="/cadastro-etiqueta/:code"
+              element={<QuickLabelRegistrationPage />}
             />
             <Route
               path="/pendencias-cadastro"

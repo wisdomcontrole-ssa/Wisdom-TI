@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { InventoryScanner } from '../components/field/InventoryScanner'
 import { PageHeader } from '../components/ui/PageHeader'
 import { resolveInventoryCode } from '../data/field-ops-service'
+import { findPreprintedLabel } from '../data/preprinted-labels-service'
 import type { InventoryResolvedItem } from '../types/field-ops'
 
 export function FieldScannerPage() {
@@ -28,6 +29,17 @@ export function FieldScannerPage() {
         return
       }
 
+      const rawCode = value.includes('/identificar/') ?
+        value.split('/identificar/')[1]?.split(/[?#]/)[0] : value
+      const label = await findPreprintedLabel(decodeURIComponent(rawCode || value))
+      if (label?.state === 'reserved') {
+        navigate(`/cadastro-etiqueta/${encodeURIComponent(label.code)}`)
+        return
+      }
+      if (label?.state === 'claimed' && label.asset_id) {
+        navigate(`/patrimonio/${label.asset_id}`)
+        return
+      }
       throw new Error('Código não localizado no inventário.')
     } finally {
       setBusy(false)

@@ -16,6 +16,7 @@ import {
   useState,
 } from 'react'
 import QRCode from 'react-qr-code'
+import { Link } from 'react-router'
 import { useBranding } from '../branding/BrandContext'
 import { InventoryScanner } from '../components/field/InventoryScanner'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -297,6 +298,9 @@ export function LabelsPage() {
         description="Selecione ativos e componentes, defina a quantidade de cópias e gere folhas A4 com etiquetas de 90 × 50 mm."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Link to="/etiquetas/antecipadas" className="inline-flex h-10 items-center rounded-xl bg-sky-700 px-4 text-xs font-bold text-white">
+              Etiquetas antecipadas
+            </Link>
             <button
               type="button"
               onClick={() => void refresh()}

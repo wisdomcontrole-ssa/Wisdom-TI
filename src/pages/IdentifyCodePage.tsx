@@ -9,6 +9,7 @@ import {
   useParams,
 } from 'react-router'
 import { resolveInventoryCode } from '../data/field-ops-service'
+import { findPreprintedLabel } from '../data/preprinted-labels-service'
 
 export function IdentifyCodePage() {
   const { code = '' } = useParams()
@@ -34,6 +35,16 @@ export function IdentifyCodePage() {
           return
         }
 
+        const label = await findPreprintedLabel(code)
+        if (!active) return
+        if (label?.state === 'claimed' && label.asset_id) {
+          navigate(`/patrimonio/${label.asset_id}`, { replace: true })
+          return
+        }
+        if (label?.state === 'reserved') {
+          navigate(`/cadastro-etiqueta/${encodeURIComponent(label.code)}`, { replace: true })
+          return
+        }
         setErrorMessage('Código não localizado.')
       } catch (error) {
         if (!active) return

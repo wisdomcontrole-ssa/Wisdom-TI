@@ -460,3 +460,16 @@ Validacao manual:
 - botao Ler visivel;
 - leitura do codigo de barras preenchendo o campo aprovada.
 <!-- M17_2_THIRDPARTY_HOTFIX_END -->
+
+<!-- M18_PREPRINTED_BEGIN -->
+## M18 — Etiquetas antecipadas e cadastro por leitura
+Estado: gerado localmente; depende de aplicar migration M18 nas duas instancias e realizar testes funcionais.
+Arquitetura: tabela preprinted_labels; lotes com códigos QR-XXXXXXXXXXXX aleatórios gerados no PostgreSQL, únicos, reservados antes de impressão; RPCs m18_issue_labels, m18_get_label e m18_claim_label com permissões RBAC.
+Cadastro: QR reservado abre cadastro rápido por tipo, serial, código de terceiro, origem, leitura de código de barras e foto de etiqueta existente; registro cria assets com asset_code igual ao código reservado, status stock e registration_state express_pending. Complementação pela ficha/edição existente. Tipos de ativos novos adicionados sem sobrescrever existentes.
+Frontend: BlankLabelsPage, QuickLabelRegistrationPage, preprinted-labels-service; rotas /etiquetas/antecipadas e /cadastro-etiqueta/:code; identificação e scanner universais encaminham etiquetas reservadas.
+Segurança: travamento da etiqueta no claim, transação atômica, autorização assets.create, log de auditoria e prevenção de códigos duplicados. Não criar ativos fictícios ao emitir lote.
+OCR: SmartLabelReader preservado; sem alteração de motor/câmera.
+Banco: supabase/migrations/20261030180000_m18_reserved_labels.sql. Aplicar uma única vez nas duas bases via Supabase SQL editor; não reescrever migrations anteriores.
+Testes locais: node scripts/test-m18-source.mjs; npm run build; git diff --check.
+Pendências: SQL em ambas as bases, validação real de emissão 50 etiquetas, reimpressão no momento da emissão, leitura, cadastro e persistência; só depois publicação.
+<!-- M18_PREPRINTED_END -->
