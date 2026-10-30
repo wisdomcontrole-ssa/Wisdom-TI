@@ -7,31 +7,42 @@ import { resolveInventoryCode } from '../data/field-ops-service'
 import { findPreprintedLabel } from '../data/preprinted-labels-service'
 import type { InventoryResolvedItem } from '../types/field-ops'
 
+function normalizeScannedCode(input: string): string {
+  let raw = input.trim()
+  // QR convencional pode carregar URL absoluta em vez do código.
+  try {
+    const url = new URL(raw)
+    const match = url.pathname.match(/\/(?:identificar|ativo|cadastro-etiqueta)\/([^/?#]+)/i)
+    if (match) raw = decodeURIComponent(match[1])
+  } catch {
+    const match = raw.match(/\/(?:identificar|ativo|cadastro-etiqueta)\/([^/?#]+)/i)
+    if (match) raw = decodeURIComponent(match[1])
+  }
+  return raw.replace(/^[\s"'`]+|[\s"'`]+$/g, '').toUpperCase()
+}
+
 export function FieldScannerPage() {
   const navigate = useNavigate()
-  const [last, setLast] =
-    useState<InventoryResolvedItem | null>(null)
+  const [last, setLast] = useState<InventoryResolvedItem | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function handleScan(value: string) {
+    const code = normalizeScannedCode(value)
+    if (!code) throw new Error('Código vazio.')
     try {
       setBusy(true)
-      const item = await resolveInventoryCode(value)
+      const item = await resolveInventoryCode(code)
       setLast(item)
-
       if (item.kind === 'asset' && item.id) {
         navigate(`/patrimonio/${item.id}`)
         return
       }
-
       if (item.kind === 'stock_unit' && item.id) {
         navigate(`/estoque/${item.id}`)
         return
       }
 
-      const rawCode = value.includes('/identificar/') ?
-        value.split('/identificar/')[1]?.split(/[?#]/)[0] : value
-      const label = await findPreprintedLabel(decodeURIComponent(rawCode || value))
+      const label = await findPreprintedLabel(code)
       if (label?.state === 'reserved') {
         navigate(`/cadastro-etiqueta/${encodeURIComponent(label.code)}`)
         return
@@ -40,7 +51,7 @@ export function FieldScannerPage() {
         navigate(`/patrimonio/${label.asset_id}`)
         return
       }
-      throw new Error('Código não localizado no inventário.')
+      throw new Error(`Código ${code} lido, mas não consta como etiqueta reservada ou item cadastrado.`)
     } finally {
       setBusy(false)
     }
@@ -51,25 +62,13 @@ export function FieldScannerPage() {
       <PageHeader
         eyebrow="Operação de campo"
         title="Escanear item"
-        description="Aponte a câmera para o QR Code ou código de barras. Código interno, Código de terceiro e serial do fabricante levam à mesma ficha quando cadastrados."
+        description="Leia QR Code, código de barras, serial ou Código de terceiro. Etiquetas antecipadas reservadas abrem o cadastro rápido."
       />
-
-      <InventoryScanner
-        disabled={busy}
-        onScan={async (value) => {
-          await handleScan(value)
-        }}
-      />
-
+      <InventoryScanner disabled={busy} onScan={async (value) => { await handleScan(value) }} />
       {last?.kind === 'unknown' && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-          <div className="flex items-center gap-2 text-sm font-bold text-red-700">
-            <ScanLine size={16} />
-            Código não localizado
-          </div>
-          <div className="mt-2 font-mono text-xs text-red-600">
-            {last.code}
-          </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800">
+          <div className="flex items-center gap-2 font-bold"><ScanLine size={16}/> Último código sem cadastro patrimonial</div>
+          <div className="mt-2 font-mono">{last.code}</div>
         </div>
       )}
     </div>

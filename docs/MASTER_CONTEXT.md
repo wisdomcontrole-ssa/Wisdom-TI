@@ -473,3 +473,16 @@ Banco: supabase/migrations/20261030180000_m18_reserved_labels.sql. Aplicar uma �
 Testes locais: node scripts/test-m18-source.mjs; npm run build; git diff --check.
 Pendências: SQL em ambas as bases, validação real de emissão 50 etiquetas, reimpressão no momento da emissão, leitura, cadastro e persistência; só depois publicação.
 <!-- M18_PREPRINTED_END -->
+
+<!-- M18_SCANNER_HOTFIX_BEGIN -->
+## M18 — diagnostico do leitor e logomarca no celular
+Estado: build local aprovado; publicacao controlada da Instancia 1.
+- InventarioScanner: area adaptativa da camera, exibe ultima decodificacao e erro de consulta separadamente.
+- FieldScannerPage: normaliza QR com codigo ou URL, consulta etiqueta antecipada reservada e encaminha cadastro.
+- WisdomMark: fallback visual quando logomarca nao carrega.
+- MobileFieldActions: barra flutuante nao cobre leitor/cadastro da etiqueta.
+- Nao alterados: SmartLabelReader, asset-label-ocr e motor de OCR de etiquetas.
+- Nenhuma migration, SQL ou alteracao do agente nesta publicacao.
+- Instancia 2 permanece inalterada.
+- Teste pendente: ler QR impresso no celular, conferir ultimo codigo lido, cadastro rapido e logotipo.
+<!-- M18_SCANNER_HOTFIX_END -->
